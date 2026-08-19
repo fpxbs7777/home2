@@ -14,6 +14,7 @@ import {
   Calculator,
   GripVertical,
   BookOpen,
+  Square,
 } from "lucide-react";
 import { CHAT_OPEN_EVENT_NAME } from "@/lib/chat-open";
 import {
@@ -35,6 +36,29 @@ import {
 } from "@/components/ui/select";
 
 const WHATSAPP = "https://wa.me/541162355944";
+
+const SESSION_STORAGE_KEY = "norte-session-id";
+
+function obtenerSessionId(): string {
+  try {
+    let id = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!id) {
+      id = `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      window.localStorage.setItem(SESSION_STORAGE_KEY, id);
+    }
+    return id;
+  } catch {
+    return "anon";
+  }
+}
+
+function limpiarSessionId(): void {
+  try {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    /* sin storage */
+  }
+}
 
 const MODELOS_RAPIDEZ = obtenerModelosPorCategoria("rapidez");
 const MODELOS_RAZONAMIENTO = obtenerModelosPorCategoria("razonamiento");
@@ -117,6 +141,7 @@ export function ChatWidget() {
   const [model, setModel] = useState<string>(MODELO_POR_DEFECTO.id);
   const [modelInfo, setModelInfo] = useState<AgentModel>(MODELO_POR_DEFECTO);
   const [loading, setLoading] = useState(false);
+  const [queue, setQueue] = useState<string[]>([]);
   const [searching, setSearching] = useState<string | null>(null);
   const [consultando, setConsultando] = useState(false);
   const [buscandoNoticias, setBuscandoNoticias] = useState(false);
@@ -124,6 +149,14 @@ export function ChatWidget() {
   const [valorando, setValorando] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const queueRef = useRef<string[]>([]);
+  const busyRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef<Msg[]>(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -176,6 +209,7 @@ export function ChatWidget() {
       const next = [...prev];
       const last = next[next.length - 1];
       if (last) next[next.length - 1] = { ...last, ...patch };
+      messagesRef.current = next;
       return next;
     });
   }
@@ -196,24 +230,44 @@ export function ChatWidget() {
 
   async function send(text: string) {
     const question = text.trim();
-    if (!question || loading) return;
+    if (!question) return;
+    if (busyRef.current) {
+      queueRef.current = [...queueRef.current, question];
+      setQueue([...queueRef.current]);
+      setInput("");
+      return;
+    }
+    await process(question);
+  }
+
+  /** Procesa una pregunta manteniendo el hilo: usa el historial completo acumulado hasta ese turno. */
+  async function process(question: string) {
+    busyRef.current = true;
     const history = [
-      ...messages.filter((m) => m !== WELCOME),
+      ...messagesRef.current.filter((m) => m !== WELCOME),
       { role: "user" as const, content: question },
     ].map((m) => ({ role: m.role, content: m.content }));
-    setMessages((prev) => [
-      ...prev,
+    const nuevoTurno: Msg[] = [
       { role: "user", content: question },
       { role: "assistant", content: "" },
-    ]);
+    ];
+    setMessages((prev) => {
+      const next = [...prev, ...nuevoTurno];
+      messagesRef.current = next;
+      return next;
+    });
     setInput("");
     setLoading(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, model }),
+        body: JSON.stringify({ messages: history, model, sessionId: obtenerSessionId() }),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         const detail = await res.text().catch(() => "");
@@ -296,19 +350,41 @@ export function ChatWidget() {
       }
       if (buffer) handle(buffer);
     } catch (err) {
-      const msg =
-        err instanceof Error && err.message ? err.message : "No pude responder ahora mismo.";
-      updateLast({
-        content: `${msg}\n\nPodés escribirle directo a Cintia por [WhatsApp](${WHATSAPP}).`,
-      });
+      const esAbort = err instanceof Error && err.name === "AbortError";
+      if (!esAbort) {
+        const msg =
+          err instanceof Error && err.message ? err.message : "No pude responder ahora mismo.";
+        updateLast({
+          content: `${msg}\n\nPodés escribirle directo a Cintia por [WhatsApp](${WHATSAPP}).`,
+        });
+      }
     } finally {
+      abortRef.current = null;
       setSearching(null);
       setConsultando(false);
       setBuscandoNoticias(false);
       setLeyendo(false);
       setValorando(false);
+      busyRef.current = false;
       setLoading(false);
+      // Preguntas en cola: se procesan en orden, manteniendo el hilo acumulado.
+      if (queueRef.current.length > 0) {
+        const [next, ...rest] = queueRef.current;
+        queueRef.current = rest;
+        setQueue(rest);
+        void process(next!);
+      }
     }
+  }
+
+  /** Interrumpe la respuesta en curso. La siguiente pregunta en cola arranca de inmediato. */
+  function cancelCurrent() {
+    abortRef.current?.abort();
+  }
+
+  function limpiarCola() {
+    queueRef.current = [];
+    setQueue([]);
   }
 
   return (
@@ -388,7 +464,23 @@ export function ChatWidget() {
             </p>
           </div>
           <button
-            onClick={() => setMessages([WELCOME])}
+            onClick={() => {
+              abortRef.current?.abort();
+              queueRef.current = [];
+              setQueue([]);
+              try {
+                void fetch(
+                  `/api/chat?sessionId=${encodeURIComponent(obtenerSessionId())}`,
+                  { method: "DELETE" },
+                );
+              } catch {
+                /* sin backend de memoria */
+              }
+              limpiarSessionId();
+              const reset: Msg[] = [WELCOME];
+              messagesRef.current = reset;
+              setMessages(reset);
+            }}
             aria-label="Limpiar conversación"
             className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
@@ -522,6 +614,28 @@ export function ChatWidget() {
               }}
               className="border-t border-border p-3"
             >
+              {queue.length > 0 && (
+                <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-border/70 bg-primary/[0.05] px-2.5 py-1.5">
+                  <span className="flex-none text-[10.5px] font-semibold uppercase tracking-wide text-primary">
+                    En cola ({queue.length})
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    {queue.map((q, i) => (
+                      <p key={i} className="truncate text-[10.5px] text-muted-foreground">
+                        {i + 1}. {q}
+                      </p>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={limpiarCola}
+                    aria-label="Vaciar cola de preguntas"
+                    className="flex-none rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
               <div className="mb-2 flex items-center gap-2">
                 <Select
                   value={model}
@@ -599,12 +713,24 @@ export function ChatWidget() {
                 />
                 <button
                   type="submit"
-                  disabled={loading || !input.trim()}
+                  disabled={!input.trim()}
                   aria-label="Enviar"
+                  title={loading ? "Se agrega a la cola de preguntas" : "Enviar"}
                   className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
                 >
                   <Send className="h-4 w-4" />
                 </button>
+                {loading && (
+                  <button
+                    type="button"
+                    onClick={cancelCurrent}
+                    aria-label="Detener respuesta en curso"
+                    title="Detener la respuesta actual (la siguiente en cola arranca ya)"
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-lg border border-destructive/40 bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
               <p className="mt-2 text-center text-[10.5px] leading-snug text-muted-foreground">
                 Información general. No constituye recomendación de inversión.

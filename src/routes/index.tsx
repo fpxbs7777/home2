@@ -348,7 +348,7 @@ function RiskChip({ perfil, verificar }: { perfil: PerfilRiesgo; verificar?: boo
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
       {perfil}
-      {verificar && (
+      {verificar === true && (
         <span className="normal-case tracking-normal text-muted-foreground">· VERIFICAR</span>
       )}
     </span>
@@ -770,7 +770,7 @@ function Index() {
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center justify-between gap-2">
                         {label}
-                        <RiskChip perfil={perfil} verificar={verificar} />
+                        <RiskChip perfil={perfil} {...(verificar === true ? { verificar: true } : {})} />
                       </span>
                       <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
                         {que}
