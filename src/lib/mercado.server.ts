@@ -194,7 +194,15 @@ async function dolaresArgentinaDatos(): Promise<{
   );
   const fuentes = [FUENTE_ARGENTINADATOS];
   if (!arr?.length) return { texto: "", fuentes };
-  const casas = ["oficial", "blue", "bolsa", "contadoconliqui", "mayorista", "solidario", "turista"];
+  const casas = [
+    "oficial",
+    "blue",
+    "bolsa",
+    "contadoconliqui",
+    "mayorista",
+    "solidario",
+    "turista",
+  ];
   const etiquetas: Record<string, string> = {
     oficial: "oficial",
     blue: "blue",

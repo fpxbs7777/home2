@@ -254,7 +254,10 @@ export function TestInversor() {
     const resultado = calcularPerfil(pts);
     setPerfil(resultado);
     setEtapa("resultado");
-    guardarPerfilInversor({ id: resultado.id, nombre: resultado.nombre });
+    guardarPerfilInversor({
+      id: resultado.id,
+      nombre: resultado.nombre as "Conservador" | "Moderado" | "Agresivo",
+    });
   };
 
   const preguntasRespondidas = respuestas.filter((r) => r >= 0).length;
