@@ -1,5 +1,5 @@
 /**
- * Memoria de sesión del sistema multi-agente de NORTE.
+ * Memoria de sesión del sistema multi-agente de IA.
  *
  * Replica el patrón de la skill oficial `nemo-rl-session-memory` de NVIDIA
  * (skills-main): mantener un registro durable y legible del estado de trabajo

@@ -11,15 +11,14 @@ import {
   Phone,
   Linkedin,
   ArrowRight,
-  Compass,
   TrendingUp,
 } from "lucide-react";
-import bgImage from "@/assets/market-bg.jpg";
+import bgImage from "@/assets/bg-skyline.jpg";
 import balanzLogo from "@/assets/balanz.png";
 import inviuLogo from "@/assets/inviu.png";
 import iolLogo from "@/assets/iol.png";
 import retratoCintia from "@/assets/cintia-boos.png";
-import { requestOpenChat } from "@/lib/chat-open";
+import { SugerenciasSeccion } from "@/components/SugerenciasSeccion";
 import { TestInversor } from "@/components/TestInversor";
 import { ICONOS_INSTRUMENTO, type NombreInstrumento } from "@/components/instrument-icons";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -35,49 +34,63 @@ const CNV_REGISTRO =
   "https://www.cnv.gov.ar/SitioWeb/RegistrosPublicos/DetallesRegistrosPublicos/105037?tipoEntidadId=2&tipoAgente=302";
 const LINKEDIN = "https://www.linkedin.com/in/cintiaboos/";
 
-// Preguntas sugeridas por sección (para NORTE)
-const PREGUNTA_SECCION = {
+// Contenido real de cada sección, que el agente IA recibe para razonar y
+// proponer preguntas en tiempo real al visitante al pasar el mouse.
+function contenidoInicio(): string {
+  return `Hero del sitio de Cintia Boos, Agente Productora CNV Mat. N° 2192: "Tu norte financiero, con criterio". Asesoramiento patrimonial en Buenos Aires, Argentina: criterio, no datos sueltos, sin costo directo para el cliente (Ley 26.831). Opera con brokers ALyC registrados en la CNV. Credenciales visibles: CNV N° 2192 (matrícula verificable en el registro público), 3 brokers habilitados, asesoramiento online.`;
+}
+
+function contenidoTest(): string {
+  return `Sección Perfil: "Descubrí tu perfil de riesgo". Test del Inversor: 8 preguntas, 2 minutos, sin datos personales. Resultado orientativo (Conservador, Moderado o Agresivo) que orienta qué productos suelen adaptarse mejor a cada perfil de riesgo; la definición final la toma el cliente junto a su asesor.`;
+}
+
+function contenidoInstrumentos(
+  lista: Instrumento[],
+  perfil: PerfilResultante | null,
+  verTodos: boolean,
+): string {
+  const encabezado = perfil
+    ? verTodos
+      ? `Catálogo completo de instrumentos que se operan en cuenta comitente en un ALyC registrado en CNV.`
+      : `El visitante completó el Test del Inversor y tiene perfil ${perfil.nombre}: se muestran los instrumentos que suelen adaptarse a ese perfil.`
+    : `Catálogo de instrumentos que se operan en cuenta comitente en un ALyC registrado en CNV. Se adapta automáticamente al perfil de riesgo del visitante si completa el Test del Inversor.`;
+  const items = lista.map(
+    (i) => `- ${i.nombre} (perfil ${i.perfil}): ${i.que} ${i.moneda}. ${i.porque}. ${i.paraQuien}`,
+  );
+  return `${encabezado}\n\n${items.join("\n")}`;
+}
+
+function contenidoBrokers(): string {
+  return `Sección Brokers: "Opero a través de". Toda operación se ejecuta en la cuenta comitente del cliente, en el bróker registrado en CNV que elija. Brokers habilitados (ALyC Integral): ${BROKERS.map(
+    (b) => `${b.name} — ${b.mat}`,
+  ).join("; ")}.`;
+}
+
+function contenidoPreguntas(): string {
+  return `Sección de preguntas frecuentes ("Lo que más preguntan"):\n${FAQ.map((f) => `P: ${f.q}\nR: ${f.a}`).join(
+    "\n\n",
+  )}`;
+}
+
+function contenidoAlianzas(): string {
+  return `Sección Alianzas ("Profesionales de confianza"). Profesionales terceros independientes, ajenos a la actividad regulada por la CNV:
+- Franco Lamas — Desarrollo de software (Presencia digital). Landing pages, sitios completos y apps a medida, con hosting incluido los primeros meses. Developer · DevOps · SRE.
+- Estudio Jurídico Dr. Pupi Cervio — Recupero de criptoestafas. Representación penal, rastreo forense de fondos y billeteras, presentación de la denuncia y seguimiento judicial. Sitio oficial: pupicervio.com.`;
+}
+
+// Pregunta de respaldo si el agente no responde con sugerencias (fallback mínimo).
+const FALLBACK_SECCION = {
   inicio:
     "¿Cómo funciona el asesoramiento de Cintia Boos, Agente Productora CNV, y cómo se empieza?",
-  servicios:
-    "¿Cómo trabajan juntos NORTE y Cintia para construir una cartera de inversiones personalizada?",
+  "test-inversor":
+    "¿Cómo puedo conocer mi perfil de inversor y qué productos suelen adaptarse mejor a cada perfil de riesgo?",
   instrumentos:
-    "Contame sobre los instrumentos disponibles en el mercado de capitales argentino (bonos, acciones, CEDEARs, ONs, letras, money market, etc.) y cómo elegirlos según perfil y horizonte.",
-  test: "¿Cómo puedo conocer mi perfil de inversor y qué productos suelen adaptarse mejor a cada perfil de riesgo?",
+    "¿Qué instrumentos se pueden operar en el mercado de capitales argentino y cómo elegirlos según perfil y horizonte?",
   brokers:
     "¿Qué es un ALyC registrado en la CNV y en qué debería fijarme al elegir un bróker para operar?",
-  preguntas:
-    "Respondeme las dudas más comunes antes de empezar a invertir: costos, capital inicial, nivel de conocimiento necesario y seguridad de operar con un ALyC regulado.",
-  alianzas:
-    "Contame sobre los profesionales aliados del sitio: Franco Lamas (desarrollo de software) y el Estudio Jurídico Dr. Pupi Cervio (recupero de criptoestafas), y cómo contactarlos.",
-  contacto:
-    "Contame sobre los servicios de Cintia Boos, Agente Productora CNV Mat. N° 2192, y cómo puedo empezar a invertir.",
+  preguntas: "Respondeme las dudas más comunes antes de empezar a invertir.",
+  alianzas: "Contame sobre los profesionales aliados del sitio y cómo contactarlos.",
 } as const;
-
-const PREGUNTA_INSTRUMENTO: Record<string, string> = {
-  "Bonos soberanos":
-    "Explicame qué son los bonos soberanos y qué debería tener en cuenta antes de invertir en ellos. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  "Obligaciones negociables":
-    "Explicame qué son las obligaciones negociables (ONs) y qué debería tener en cuenta antes de invertir en ellas. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  "Acciones locales (BCBA)":
-    "Explicame cómo funcionan las acciones locales que cotizan en la Bolsa de Buenos Aires (BCBA) y qué debería tener en cuenta antes de invertir. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  "Acciones internacionales":
-    "Explicame cómo operar acciones internacionales y qué debería tener en cuenta antes de invertir en ellas. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  CEDEARs:
-    "Explicame qué son los CEDEARs, cómo funcionan en pesos dentro de la Bolsa local y qué debería tener en cuenta antes de invertir. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  ADRs: "Explicame qué son los ADRs, cómo se diferencian de las acciones locales y qué debería tener en cuenta antes de invertir. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  ETFs: "Explicame qué son los ETFs (fondos cotizados), cómo funcionan y qué debería tener en cuenta antes de invertir. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  "Letras del Tesoro":
-    "Explicame qué son las letras del Tesoro (LECAP/BONCAP), cómo se compran y qué debería tener en cuenta antes de invertir. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  "Money market":
-    "Explicame qué es el money market (fondos de mercado de dinero), para qué sirve y qué debería tener en cuenta antes de invertir. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  "Cauciones bursátiles":
-    "Explicame qué son las cauciones bursátiles, cómo funcionan y qué debería tener en cuenta antes de usarlas. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  "Cheques de pago diferido":
-    "Explicame qué son los cheques de pago diferido, cómo se negocian y qué debería tener en cuenta antes de invertir. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-  Opciones:
-    "Explicame cómo funcionan las opciones (calls y puts), sus riesgos y qué debería tener en cuenta antes de operarlas. Además, proponé preguntas que pueda hacerte sobre este instrumento.",
-};
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -117,7 +130,6 @@ const NAV = [
   { id: "inicio", label: "Inicio" },
   { id: "test-inversor", label: "Perfil" },
   { id: "instrumentos", label: "Instrumentos" },
-  { id: "servicios", label: "Método" },
   { id: "brokers", label: "Brokers" },
   { id: "preguntas", label: "Preguntas" },
   { id: "alianzas", label: "Alianzas" },
@@ -134,32 +146,6 @@ const CREDIBILIDAD = [
   { value: "Sin costo", label: "Para vos · Ley 26.831" },
   { value: "Buenos Aires", label: "Argentina · asesoramiento online" },
 ];
-
-const PASOS = [
-  {
-    tag: "Paso 1",
-    title: "Diagnóstico",
-    body: "Vemos dónde estás parado y qué riesgo tolerás, antes de mover un peso.",
-  },
-  {
-    tag: "Paso 2",
-    title: "Diseño de cartera",
-    body: "Bonos, acciones y CEDEARs según tu horizonte y tu moneda. No un producto genérico.",
-    bullets: [
-      "Dolarización: flujo de fondos en USD con bonos y ONs.",
-      "Ordenar lo que ya tenés: reacomodo con modelos cuantitativos.",
-      "Análisis: fundamental y técnico para acompañar decisiones.",
-    ],
-  },
-  {
-    tag: "Paso 3",
-    title: "Seguimiento",
-    body: "Reportes periódicos, para que tu perfil de riesgo se respete siempre.",
-  },
-];
-
-const DELEGACION_NOTE =
-  "Mandato discrecional con límites que definimos juntos, por contrato con el bróker.";
 
 type PerfilRiesgo = "Conservador" | "Moderado" | "Agresivo";
 
@@ -320,27 +306,6 @@ const FAQ = [
 const CONTAINER = "mx-auto w-full max-w-[1240px] px-5 sm:px-8 lg:px-12";
 const SECTION = "scroll-mt-20 py-24 lg:py-28";
 
-function NorteButton({
-  question,
-  label = "Preguntar a NORTE",
-  className = "",
-}: {
-  question: string;
-  label?: string;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => requestOpenChat(question)}
-      className={`inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-[12.5px] font-semibold text-primary transition-colors hover:border-primary hover:bg-primary/15 ${className}`}
-    >
-      <Compass className="h-4 w-4" />
-      {label}
-    </button>
-  );
-}
-
 function RiskChip({ perfil, verificar }: { perfil: PerfilRiesgo; verificar?: boolean }) {
   const tone =
     perfil === "Conservador"
@@ -366,13 +331,11 @@ function SectionHeading({
   title,
   lead,
   align = "left",
-  aiQuestion,
 }: {
   label: string;
   title: string;
   lead?: React.ReactNode;
   align?: "left" | "center";
-  aiQuestion?: string;
 }) {
   const center = align === "center";
   return (
@@ -391,11 +354,6 @@ function SectionHeading({
         <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground lg:text-[19px]">
           {lead}
         </p>
-      )}
-      {aiQuestion && (
-        <div className={`mt-6 ${center ? "flex justify-center" : ""}`}>
-          <NorteButton question={aiQuestion} />
-        </div>
       )}
     </div>
   );
@@ -582,6 +540,12 @@ function Index() {
         </header>
 
         {/* ============ HERO ============ */}
+        <SugerenciasSeccion
+          id="inicio"
+          label="Inicio"
+          contenido={contenidoInicio()}
+          fallbackPregunta={FALLBACK_SECCION.inicio}
+        >
         <section id="inicio" className="relative flex min-h-[88svh] items-center overflow-hidden">
           <div
             aria-hidden
@@ -625,17 +589,10 @@ function Index() {
                 Escribime por WhatsApp
                 <ArrowRight className="h-4 w-4" />
               </WhatsAppLink>
-              <button
-                type="button"
-                onClick={() => requestOpenChat(PREGUNTA_SECCION.inicio)}
-                className="inline-flex items-center gap-2.5 rounded-full border border-gold/50 px-7 py-3.5 text-[14px] font-semibold text-gold transition-all hover:-translate-y-0.5 hover:bg-gold/10"
-              >
-                <Compass className="h-4 w-4" />
-                Preguntar a NORTE
-              </button>
             </div>
           </div>
         </section>
+        </SugerenciasSeccion>
 
         {/* ============ BARRA DE CREDIBILIDAD ============ */}
         <section className="border-y border-border/50 bg-background/20 backdrop-blur-sm">
@@ -678,18 +635,31 @@ function Index() {
         </section>
 
         {/* ============ TEST DEL INVERSOR ============ */}
-        <section id="test-inversor" className={SECTION}>
-          <div className={CONTAINER}>
-            <SectionHeading
-              label="Perfil"
-              title="Descubrí tu perfil de riesgo"
-              lead="Ocho preguntas, 2 minutos, sin datos personales. Un resultado orientativo para arrancar la conversación con criterio."
-            />
-            <TestInversor />
-          </div>
-        </section>
+        <SugerenciasSeccion
+          id="test-inversor"
+          label="Perfil"
+          contenido={contenidoTest()}
+          fallbackPregunta={FALLBACK_SECCION["test-inversor"]}
+        >
+          <section id="test-inversor" className={SECTION}>
+            <div className={CONTAINER}>
+              <SectionHeading
+                label="Perfil"
+                title="Descubrí tu perfil de riesgo"
+                lead="Ocho preguntas, 2 minutos, sin datos personales. Un resultado orientativo para arrancar la conversación con criterio."
+              />
+              <TestInversor />
+            </div>
+          </section>
+        </SugerenciasSeccion>
 
         {/* ============ INSTRUMENTOS ============ */}
+        <SugerenciasSeccion
+          id="instrumentos"
+          label="Instrumentos"
+          contenido={contenidoInstrumentos(instrumentosMostrados, perfilInv, verTodos)}
+          fallbackPregunta={FALLBACK_SECCION.instrumentos}
+        >
         <section
           id="instrumentos"
           className={`${SECTION} border-y border-border/50 bg-background/15 backdrop-blur-sm`}
@@ -713,7 +683,6 @@ function Index() {
                   registrado en la CNV.
                 </>
               }
-              aiQuestion={PREGUNTA_SECCION.instrumentos}
             />
 
             {perfilInv && !verTodos && (
@@ -782,16 +751,9 @@ function Index() {
                     </span>
                   );
                   return (
-                    <button
+                    <div
                       key={nombre}
-                      type="button"
-                      onClick={() =>
-                        requestOpenChat(
-                          PREGUNTA_INSTRUMENTO[nombre] ?? `Explicame qué son ${nombre}.`,
-                        )
-                      }
-                      title={`Preguntar a NORTE sobre ${nombre}`}
-                      className="surface-card group flex items-start gap-4 rounded-xl px-5 py-5 text-left transition-all hover:border-primary/60 hover:bg-primary/[0.06]"
+                      className="surface-card group flex items-start gap-4 rounded-xl px-5 py-5 text-left transition-colors hover:border-primary/60 hover:bg-primary/[0.06]"
                     >
                       <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#0a0f1a] to-[#151d30] text-gold ring-1 ring-gold/30 transition-colors group-hover:text-primary group-hover:ring-primary/40">
                         <Icon className="h-5 w-5" />
@@ -817,68 +779,22 @@ function Index() {
                           {paraQuien}
                         </span>
                       </span>
-                    </button>
+                    </div>
                   );
                 },
               )}
             </div>
           </div>
         </section>
-
-        {/* ============ CÓMO TRABAJAMOS ============ */}
-        <section id="servicios" className={SECTION}>
-          <div className={CONTAINER}>
-            <SectionHeading
-              label="Método"
-              title="Cómo trabajamos"
-              lead="Tres pasos, un mismo criterio: tu perfil de riesgo se respeta siempre. Sin cargo directo para vos."
-              aiQuestion={PREGUNTA_SECCION.servicios}
-            />
-
-            <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {PASOS.map((s, i) => (
-                <article
-                  key={s.title}
-                  className="surface-card relative overflow-hidden rounded-2xl p-7 lg:p-8"
-                >
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background:
-                        "radial-gradient(26rem 16rem at 85% 0%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 70%)",
-                    }}
-                  />
-                  <p className="relative font-display text-5xl font-semibold italic text-gold/80 lg:text-6xl">
-                    {String(i + 1).padStart(2, "0")}
-                  </p>
-                  <p className="relative mt-5 text-[10.5px] uppercase tracking-[0.18em] text-primary">
-                    {s.tag}
-                  </p>
-                  <h3 className="relative mt-2 font-display text-[24px] font-semibold leading-tight">
-                    {s.title}
-                  </h3>
-                  <p className="relative mt-3 text-[15.5px] leading-relaxed text-muted-foreground">
-                    {s.body}
-                  </p>
-                  {s.bullets && (
-                    <ul className="relative mt-5 space-y-1.5 border-t border-border pt-5 text-[13.5px] leading-relaxed text-muted-foreground">
-                      {s.bullets.map((b) => (
-                        <li key={b}>— {b}</li>
-                      ))}
-                    </ul>
-                  )}
-                </article>
-              ))}
-            </div>
-
-            <p className="mx-auto mt-8 max-w-2xl border-l-2 border-gold/40 pl-4 text-[13px] leading-relaxed text-muted-foreground">
-              Delegación opcional. {DELEGACION_NOTE}
-            </p>
-          </div>
-        </section>
+        </SugerenciasSeccion>
 
         {/* ============ BROKERS ============ */}
+        <SugerenciasSeccion
+          id="brokers"
+          label="Brokers"
+          contenido={contenidoBrokers()}
+          fallbackPregunta={FALLBACK_SECCION.brokers}
+        >
         <section
           id="brokers"
           className={`${SECTION} border-y border-border/50 bg-background/10 backdrop-blur-sm`}
@@ -888,7 +804,6 @@ function Index() {
               label="Brokers"
               title="Opero a través de"
               lead="Toda operación se ejecuta en tu cuenta comitente, en el bróker registrado en CNV que elijas."
-              aiQuestion={PREGUNTA_SECCION.brokers}
             />
 
             <div className="mt-14">
@@ -929,8 +844,15 @@ function Index() {
             </div>
           </div>
         </section>
+        </SugerenciasSeccion>
 
         {/* ============ PREGUNTAS ============ */}
+        <SugerenciasSeccion
+          id="preguntas"
+          label="Preguntas"
+          contenido={contenidoPreguntas()}
+          fallbackPregunta={FALLBACK_SECCION.preguntas}
+        >
         <section id="preguntas" className={SECTION}>
           <div className={CONTAINER}>
             <SectionHeading
@@ -938,7 +860,6 @@ function Index() {
               title="Lo que más preguntan"
               lead="Respuestas directas a las dudas más comunes antes de empezar."
               align="center"
-              aiQuestion={PREGUNTA_SECCION.preguntas}
             />
 
             <div className="mx-auto mt-14 max-w-3xl">
@@ -960,8 +881,15 @@ function Index() {
             </div>
           </div>
         </section>
+        </SugerenciasSeccion>
 
         {/* ============ ALIANZAS ============ */}
+        <SugerenciasSeccion
+          id="alianzas"
+          label="Alianzas"
+          contenido={contenidoAlianzas()}
+          fallbackPregunta={FALLBACK_SECCION.alianzas}
+        >
         <section
           id="alianzas"
           className={`${SECTION} border-t border-border/50 bg-background/10 backdrop-blur-sm`}
@@ -971,7 +899,6 @@ function Index() {
               label="Alianzas"
               title="Profesionales de confianza"
               lead="Servicios complementarios que recomiendo cuando hacen falta."
-              aiQuestion={PREGUNTA_SECCION.alianzas}
             />
 
             <div className="mx-auto mt-14 max-w-3xl">
@@ -1070,6 +997,7 @@ function Index() {
             </div>
           </div>
         </section>
+        </SugerenciasSeccion>
 
         {/* ============ CTA FINAL ============ */}
         <section className="relative overflow-hidden border-t border-border/60 py-24 lg:py-28">

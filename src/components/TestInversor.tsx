@@ -441,7 +441,7 @@ export function TestInversor() {
                 className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-6 py-3 text-[14px] font-semibold text-primary transition-colors hover:border-primary hover:bg-primary/15"
               >
                 <Sparkles className="h-4 w-4" />
-                Preguntarle a NORTE
+                Preguntarle a IA
               </button>
               <button
                 onClick={reiniciar}

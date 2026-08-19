@@ -1,5 +1,5 @@
 /**
- * Ejecutores de las herramientas del asistente NORTE.
+ * Ejecutores de las herramientas del asistente IA.
  *
  * Cada ejecutor recibe los argumentos crudos del tool call (JSON string) y
  * devuelve { texto, fuentes }. Son los bloques que ejecutan los agentes

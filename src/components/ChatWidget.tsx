@@ -69,7 +69,7 @@ type Msg = { role: "user" | "assistant"; content: string; sources?: Fuente[] };
 const WELCOME: Msg = {
   role: "assistant",
   content:
-    "Soy **NORTE**, asistente del mercado de capitales argentino. Respondo sobre instrumentos, riesgo y cotizaciones con material académico y fuentes oficiales — y te digo siempre de dónde saqué el dato.\n\nPodés arrancar por acá:\n- **¿Qué pasa si la acción cae?**\n- Diferencia entre **acciones y CFDs**\n- **¿Tu bróker está regulado por la CNV?**\n- **¿Cómo arranco a invertir?**\n- ONs que se **operan en pesos y pagan en dólares**\n\nSi el dato es de mercado, lo busco en fuentes reales y te muestro la fuente. Información general. No constituye recomendación de inversión.",
+    "Soy **IA**, asistente del mercado de capitales argentino. Respondo sobre instrumentos, riesgo y cotizaciones con material académico y fuentes oficiales — y te digo siempre de dónde saqué el dato.\n\nPodés arrancar por acá:\n- **¿Qué pasa si la acción cae?**\n- Diferencia entre **acciones y CFDs**\n- **¿Tu bróker está regulado por la CNV?**\n- **¿Cómo arranco a invertir?**\n- ONs que se **operan en pesos y pagan en dólares**\n\nSi el dato es de mercado, lo busco en fuentes reales y te muestro la fuente. Información general. No constituye recomendación de inversión.",
 };
 
 const SUGGESTIONS = [
@@ -489,11 +489,11 @@ export function ChatWidget() {
         )}
         <header className="flex items-center gap-3 border-b border-border px-4 py-3.5">
           <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-gold/60 bg-gradient-to-br from-[#0a0f1a] to-[#141b2e] font-display text-[15px] font-semibold text-gold shadow-[0_0_18px_rgba(201,162,39,0.35)]">
-            N
+            IA
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13.5px] font-semibold">
-              NORTE <span className="text-gold">·</span>{" "}
+              IA <span className="text-gold">·</span>{" "}
               <span className="text-muted-foreground">
                 Asistente del mercado de capitales argentino
               </span>

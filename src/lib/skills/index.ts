@@ -1,6 +1,6 @@
 /**
  * Skills oficiales replicadas del catálogo NVIDIA (skills-main) y adaptadas al
- * asistente financiero NORTE. Cada skill sigue la anatomía del spec oficial:
+ * asistente financiero IA. Cada skill sigue la anatomía del spec oficial:
  * name, description, purpose, when-to-use e instructions.
  *
  * Se orquestan automáticamente según el modelo seleccionado en el chat: los

@@ -1,5 +1,5 @@
 /**
- * Definición de herramientas del asistente NORTE (esquema OpenAI function).
+ * Definición de herramientas del asistente IA (esquema OpenAI function).
  * Compartido por todos los agentes del sistema multi-agente.
  */
 

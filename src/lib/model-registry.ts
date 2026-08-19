@@ -1,5 +1,5 @@
 /**
- * Registro de modelos disponibles para el asistente NORTE.
+ * Registro de modelos disponibles para el asistente IA.
  *
  * Seleccionados del catálogo público de NVIDIA (build.nvidia.com) descartando
  * los modelos deprecated. Cada modelo define su categoría, una mini descripción

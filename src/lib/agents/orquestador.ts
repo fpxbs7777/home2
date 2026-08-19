@@ -1,5 +1,5 @@
 /**
- * Orquestador del sistema multi-agente de NORTE.
+ * Orquestador del sistema multi-agente de IA.
  *
  * Flujo:
  * 1. Router: detecta qué agentes especializados corresponden a la pregunta.
@@ -164,7 +164,7 @@ async function postCompletionsResiliente(
   );
 }
 
-async function llamarModelo(
+export async function llamarModelo(
   apiKey: string,
   modelId: string,
   messages: ApiMsg[],

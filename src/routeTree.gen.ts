@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AsesorRouteImport } from './routes/asesor'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as ApiSugerenciasRouteImport } from './routes/api/sugerencias'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
   path: '/api/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSugerenciasRoute = ApiSugerenciasRouteImport.update({
+  id: '/api/sugerencias',
+  path: '/api/sugerencias',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/asesor': typeof AsesorRoute
   '/api/chat': typeof ApiChatRoute
   '/api/search': typeof ApiSearchRoute
+  '/api/sugerencias': typeof ApiSugerenciasRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/asesor': typeof AsesorRoute
   '/api/chat': typeof ApiChatRoute
   '/api/search': typeof ApiSearchRoute
+  '/api/sugerencias': typeof ApiSugerenciasRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,20 @@ export interface FileRoutesById {
   '/asesor': typeof AsesorRoute
   '/api/chat': typeof ApiChatRoute
   '/api/search': typeof ApiSearchRoute
+  '/api/sugerencias': typeof ApiSugerenciasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/asesor' | '/api/chat' | '/api/search'
+  fullPaths: '/' | '/asesor' | '/api/chat' | '/api/search' | '/api/sugerencias'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/asesor' | '/api/chat' | '/api/search'
-  id: '__root__' | '/' | '/asesor' | '/api/chat' | '/api/search'
+  to: '/' | '/asesor' | '/api/chat' | '/api/search' | '/api/sugerencias'
+  id:
+    | '__root__'
+    | '/'
+    | '/asesor'
+    | '/api/chat'
+    | '/api/search'
+    | '/api/sugerencias'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +82,7 @@ export interface RootRouteChildren {
   AsesorRoute: typeof AsesorRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiSearchRoute: typeof ApiSearchRoute
+  ApiSugerenciasRoute: typeof ApiSugerenciasRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +115,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sugerencias': {
+      id: '/api/sugerencias'
+      path: '/api/sugerencias'
+      fullPath: '/api/sugerencias'
+      preLoaderRoute: typeof ApiSugerenciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +130,7 @@ const rootRouteChildren: RootRouteChildren = {
   AsesorRoute: AsesorRoute,
   ApiChatRoute: ApiChatRoute,
   ApiSearchRoute: ApiSearchRoute,
+  ApiSugerenciasRoute: ApiSugerenciasRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
