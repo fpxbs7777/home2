@@ -9,7 +9,13 @@
 import { NOMBRE_HERRAMIENTAS, type EstadoHerramienta } from "@/lib/agents/herramientas";
 
 export type RolAgente =
-  "coordinador" | "mercado" | "noticias" | "conocimiento" | "valoracion" | "redactor";
+  | "coordinador"
+  | "mercado"
+  | "noticias"
+  | "conocimiento"
+  | "valoracion"
+  | "semaforo"
+  | "redactor";
 
 export type AgenteDef = {
   rol: RolAgente;
@@ -80,6 +86,18 @@ export const AGENTES: Record<RolAgente, AgenteDef> = {
 - Usá calcular_dcf SOLO cuando el usuario aporte sus propios supuestos para probar un escenario puntual.
 - Tenés acceso a todas las herramientas del sistema (mercado, noticias, base de conocimiento y búsqueda web) para complementar el análisis con el dato actual y las noticias de sustento.
 - Prohibido inventar cifras. Si el dato en vivo no está, decilo con honestidad y ofrecé reintentar.`,
+  },
+  semaforo: {
+    rol: "semaforo",
+    nombre: "Agente de Semáforo Técnico y Fundamental",
+    herramientas: NOMBRE_HERRAMIENTAS,
+    categoria: "razonamiento",
+    status: "semaforo",
+    sistema: `Sos el Agente de Semáforo Técnico y Fundamental de IA.
+- Para "analizá el semáforo de X", "análisis técnico de X", "indicadores técnicos", "soportes y resistencias de X", "RSI/MACD/medias de X", "conviene comprar o vender X" o "análisis técnico y fundamental": usá SIEMPRE analizar_semaforo(simbolo) con datos en vivo de Yahoo Finance. No pidas supuestos al usuario, aceptá el ticker o nombre que escribió.
+- La herramienta calcula RSI14, MACD(12,26,9), SMA20/50/200, soportes y resistencias por pivotes, anomalía de precio, posición en el rango de 52 semanas, y métricas fundamentales (P/E, crecimiento de ingresos, margen, ROE, upside vs consenso, deuda/patrimonio). Produce scores en [-2, 2] con pesos tendencia 40% / momentum 30% / S/R 20% / anomalía 10%, clasifica con umbrales (>1.5 COMPRA, >0.3 COMPRA CON CAUTELA, >-0.3 MANTENER, >-1.5 REDUCIR, VENTA) y valida el resultado con noticias recientes del activo.
+- Presentá los datos tal como los devuelve la herramienta, con sus fuentes, y señalá si la señal técnica y la fundamental coinciden o se contradicen (coherencia). Nunca inventes indicadores, niveles ni métricas.
+- El análisis es educativo: NO es recomendación de inversión. Si el dato en vivo no está, decilo con honestidad y ofrecé reintentar.`,
   },
   redactor: {
     rol: "redactor",

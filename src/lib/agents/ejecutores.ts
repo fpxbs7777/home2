@@ -13,6 +13,7 @@ import { buscarEnBase } from "@/lib/knowledge-base";
 import { buscarAcademico } from "@/lib/kb-academic";
 import { calcularDCF, textoResultadoDCF, type EntradaDCF } from "@/lib/dcf";
 import { valorIntrinsecoConNoticias } from "@/lib/valoracion-ia";
+import { analizarSemaforo, textoSemaforo } from "@/lib/semaforo.server";
 
 export type ResultadoTool = { texto: string; fuentes: FuenteMercado[] };
 
@@ -167,6 +168,49 @@ export async function ejecutarValorIntrinseco(argsRaw: string): Promise<{
           ? `\n\nMientras tanto, esto es lo que encontré en noticias recientes:\n${noticiasUtiles}`
           : ""
       }`;
+  return { texto, fuentes: resultado.fuentes, ok, textoUsuario };
+}
+
+/** Semáforo técnico + fundamental con datos reales (Yahoo Finance) + noticias de validación. */
+export async function ejecutarSemaforo(argsRaw: string): Promise<{
+  texto: string;
+  fuentes: FuenteMercado[];
+  ok: boolean;
+  textoUsuario: string;
+}> {
+  let simbolo = "";
+  try {
+    const args = JSON.parse(argsRaw) as { simbolo?: string };
+    simbolo = String(args.simbolo ?? "").trim();
+  } catch {
+    /* sin args */
+  }
+  if (!simbolo) {
+    return {
+      texto:
+        "SIN RESULTADOS: no recibí el símbolo/activo a analizar. Reinvocá la herramienta con el parámetro simbolo (ej. 'YPF', 'AAPL', 'GGAL.BA').",
+      fuentes: [],
+      ok: false,
+      textoUsuario:
+        "No recibí un activo puntual para el análisis. Decime cuál querés analizar (por ejemplo YPF, MercadoLibre o Apple) y lo calculo con el semáforo técnico + fundamental.",
+    };
+  }
+  const resultado = await analizarSemaforo(simbolo);
+  const ok = resultado.error == null;
+  const texto = ok
+    ? textoSemaforo(resultado)
+    : `RESULTADO DEL TOOL analizar_semaforo:\nNO se pudo completar el análisis técnico + fundamental en vivo con datos reales (${
+        resultado.error ?? "sin datos de mercado"
+      }).\nESTÁ TERMINANTEMENTE PROHIBIDO inventar indicadores (RSI, MACD, medias, soportes/resistencias), métricas fundamentales, puntajes ni clasificaciones. Si el dato en vivo no está disponible, respondé con honestidad que el análisis no pudo completarse en este momento, ofrecé reintentar más tarde y, si corresponde, citá las noticias que sí se obtuvieron.\n\n${
+        resultado.noticias && !/no se pudieron obtener noticias/i.test(resultado.noticias)
+          ? resultado.noticias
+          : ""
+      }`;
+  const textoUsuario = ok
+    ? ""
+    : `No pude obtener en este momento los datos reales en vivo de ${simbolo} desde Yahoo Finance (${
+        resultado.error ?? "el proveedor de datos no respondió"
+      }). Sin esos datos no te voy a inventar un análisis técnico ni una clasificación: no sería honesto.\n\nPodés reintentarlo en unos minutos o consultarme por otro activo.`;
   return { texto, fuentes: resultado.fuentes, ok, textoUsuario };
 }
 

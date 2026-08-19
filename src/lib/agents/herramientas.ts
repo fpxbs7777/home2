@@ -181,10 +181,36 @@ export const TOOLS: ToolSpec[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "analizar_semaforo",
+      description:
+        "Analiza un activo con un semáforo técnico + fundamental usando datos reales en vivo de Yahoo Finance: indicadores técnicos (RSI14, MACD, SMA20/50/200, soportes y resistencias, anomalía de precio, posición en el rango de 52 semanas) y métricas fundamentales (P/E, crecimiento de ingresos, margen, ROE, upside vs consenso de analistas, deuda/patrimonio). Calcula scores en [-2, 2] con pesos tendencia 40% / momentum 30% / S/R 20% / anomalía 10%, clasifica con umbrales (>1.5 COMPRA, >0.3 COMPRA CON CAUTELA, >-0.3 MANTENER, >-1.5 REDUCIR, VENTA) y valida el resultado con noticias recientes sobre el activo. Para preguntas como 'analizá el semáforo de X', 'análisis técnico de X', 'indicadores técnicos', 'soportes y resistencias de X', 'conviene comprar o vender X', 'RSI/MACD de X'. Acepta ticker o nombre (ej. AAPL, YPF, GGAL.BA, MercadoLibre, Banco Galicia).",
+      parameters: {
+        type: "object",
+        properties: {
+          simbolo: {
+            type: "string",
+            description:
+              "Ticker o nombre del activo a analizar, en español o con su ticker de mercado (ej. 'AAPL', 'MSFT', 'YPF', 'GGAL.BA', 'MercadoLibre', 'Banco Galicia').",
+          },
+        },
+        required: ["simbolo"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export type EstadoHerramienta =
-  "searching" | "mercado" | "noticias" | "base_conocimiento" | "dcf" | "valoracion";
+  | "searching"
+  | "mercado"
+  | "noticias"
+  | "base_conocimiento"
+  | "dcf"
+  | "valoracion"
+  | "semaforo";
 
 export function estadoDeHerramienta(name: string): EstadoHerramienta {
   switch (name) {
@@ -198,6 +224,8 @@ export function estadoDeHerramienta(name: string): EstadoHerramienta {
       return "dcf";
     case "valor_intrinseco_real":
       return "valoracion";
+    case "analizar_semaforo":
+      return "semaforo";
     default:
       return "searching";
   }

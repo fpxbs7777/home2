@@ -21,6 +21,7 @@ import {
   ejecutarBaseConocimiento,
   ejecutarDCF,
   ejecutarValorIntrinseco,
+  ejecutarSemaforo,
   ejecutarBusqueda,
   validarDCFEnWeb,
   esAcademico,
@@ -84,6 +85,12 @@ function esPreguntaValoracion(pregunta: string): boolean {
   );
 }
 
+function esPreguntaSemaforo(pregunta: string): boolean {
+  return /(?:sem[aá]foro|an[aá]lisis\s+t[eé]cnico|an[aá]lisis\s+t[eé]cnico\s+y\s+fundamental|indicadores\s+t[eé]cnicos|soportes?\s+y\s+resistencias|soporte\s+y\s+resistencia|rsi|macd|medias?\s+m[oó]viles|momentum|se[nñ]al\s+de\s+(?:compra|venta)|conviene\s+(?:comprar|vender)\s+|comprar\s+o\s+vender\s+|an[aá]lisis\s+fundamental\s+de|t[eé]cnico\s+de\s+\w+|qu[eé]\s+me\s+conviene)/i.test(
+    pregunta,
+  );
+}
+
 /** Router: qué agentes especializados corresponden a la pregunta. */
 function enrutar(pregunta: string): Set<RolAgente> {
   const p = pregunta.toLowerCase();
@@ -110,6 +117,9 @@ function enrutar(pregunta: string): Set<RolAgente> {
   }
   if (esPreguntaValoracion(pregunta)) {
     activos.add("valoracion");
+  }
+  if (esPreguntaSemaforo(pregunta)) {
+    activos.add("semaforo");
   }
   if (activos.size === 0) {
     activos.add("conocimiento");
@@ -228,6 +238,10 @@ async function ejecutarTool(
       const res = await ejecutarValorIntrinseco(argsRaw);
       return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
     }
+    case "analizar_semaforo": {
+      const res = await ejecutarSemaforo(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
     default:
       return { ...(await ejecutarBusqueda(query)), ok: true };
   }
@@ -248,8 +262,8 @@ async function trabajarAgente(
 ): Promise<AgentResult> {
   const agente = obtenerAgente(rol);
   enviar({ t: "status", v: agente.status, q: pregunta });
-  const esValoracion = rol === "valoracion";
-  const modeloAgente = esValoracion ? orquestacion.modeloPlanner : MODELO_AGENTES;
+  const esAnalisis = rol === "valoracion" || rol === "semaforo";
+  const modeloAgente = esAnalisis ? orquestacion.modeloPlanner : MODELO_AGENTES;
   const mensajes: ApiMsg[] = [
     { role: "system", content: agente.sistema },
     { role: "system", content: siteContext },
@@ -264,13 +278,13 @@ async function trabajarAgente(
 
   let nota = "";
   let fuentes: FuenteMercado[] = [];
-  const limite = esValoracion ? 3 : 2;
+  const limite = esAnalisis ? 3 : 2;
   for (let ronda = 0; ronda < limite; ronda++) {
     const opciones: Record<string, number | boolean> = {
-      maxTokens: esValoracion ? modeloAgente.maxTokens : 2048,
-      enableThinking: esValoracion && modeloAgente.enableThinking,
+      maxTokens: esAnalisis ? modeloAgente.maxTokens : 2048,
+      enableThinking: esAnalisis && modeloAgente.enableThinking,
     };
-    if (esValoracion) opciones["reasoningBudget"] = 4096;
+    if (esAnalisis) opciones["reasoningBudget"] = 4096;
     const res = await llamarModelo(
       apiKey,
       modeloAgente.id,
@@ -518,6 +532,9 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
   let valoracionCalculada = false;
   let valoracionFallida = false;
   let textoValoracionFallida = "";
+  let semaforoCalculado = false;
+  let semaforoFallido = false;
+  let semaforoFallidoDetalle = "";
   let dcfEmpresa = "";
   let dcfValidadoWeb = false;
   const modeloPlanner = orquestacion.modeloPlanner;
@@ -569,13 +586,14 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
         const esBase = name === "consultar_base_conocimiento";
         const esDcf = name === "calcular_dcf";
         const esValoracion = name === "valor_intrinseco_real";
+        const esSemaforo = name === "analizar_semaforo";
         enviar({
           t: "status",
           v: estadoDeHerramienta(name),
           q:
             esMercado || esNoticias
               ? query
-              : esValoracion
+              : esValoracion || esSemaforo
                 ? extraerDatosTool(argsRaw).simbolo
                 : query,
         });
@@ -586,8 +604,13 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
           valoracionFallida = true;
           textoValoracionFallida = `No se pudo completar la valoración con datos reales en este momento.`;
         }
+        if (!ejecucion.ok && esSemaforo) {
+          semaforoFallido = true;
+          semaforoFallidoDetalle = `No se pudo completar el semáforo técnico + fundamental con datos reales en este momento.`;
+        }
         if (esPreguntaDeCausa(pregunta) && esNoticias) causaVerificada = true;
         if (esValoracion) valoracionCalculada = true;
+        if (esSemaforo) semaforoCalculado = true;
         if (esDcf) {
           try {
             dcfEmpresa = String((JSON.parse(argsRaw) as { empresa?: string }).empresa ?? "");
@@ -610,7 +633,9 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
                     ? "la valoración DCF calculada con los supuestos indicados"
                     : esValoracion
                       ? `la valoración con datos reales de Yahoo Finance, metodología del paper y noticias de sustento (fuentes externas). Interpretá el resultado comparando precio actual, valor calculado y consenso de analistas, y validalo con las noticias y la validación web adjuntas; señalá si el valor difiere del precio de mercado y por qué. No inventes cifras: si algo no está en estos datos, decilo con honestidad.`
-                      : `la búsqueda "${query}"`
+                      : esSemaforo
+                        ? `el semáforo técnico + fundamental con datos reales de Yahoo Finance (RSI, MACD, SMA, soportes/resistencias, anomalía, métricas fundamentales) y noticias de validación (fuentes externas). Presentá los indicadores y métricas tal cual figuran, explicá la coherencia entre la señal técnica y la fundamental, y aclará que es un análisis educativo y no una recomendación de inversión. No inventes cifras: si algo no está en estos datos, decilo con honestidad.`
+                        : `la búsqueda "${query}"`
           } (fuentes externas):\n\n${ejecucion.texto}`,
         };
         agentMessages.push(toolMsg);
@@ -760,6 +785,36 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
     }
   }
 
+  // ---- Red de seguridad 4: semáforo pedido pero no calculado ----
+  if (esPreguntaSemaforo(pregunta) && !semaforoCalculado) {
+    const simboloSemaforo = extraerTickerPregunta(pregunta);
+    if (simboloSemaforo) {
+      semaforoCalculado = true;
+      const callId = `semaforo_${Date.now()}`;
+      const argsSem = JSON.stringify({ simbolo: simboloSemaforo });
+      messages.push({
+        role: "assistant",
+        content: "",
+        tool_calls: [{ id: callId, function: { name: "analizar_semaforo", arguments: argsSem } }],
+      });
+      enviar({ t: "status", v: "semaforo", q: simboloSemaforo });
+      const resultado = await ejecutarSemaforo(argsSem);
+      if (!resultado.ok) {
+        semaforoFallido = true;
+        semaforoFallidoDetalle = resultado.textoUsuario;
+      }
+      fuentes.push(...resultado.fuentes);
+      if (resultado.fuentes.length) enviar({ t: "sources", v: resultado.fuentes });
+      messages.push({
+        role: "tool",
+        tool_call_id: callId,
+        name: "analizar_semaforo",
+        content: `Semáforo técnico + fundamental con datos reales de Yahoo Finance (RSI, MACD, SMA, soportes/resistencias, anomalía, métricas fundamentales) y noticias de validación (fuentes externas). Presentá los indicadores y métricas tal cual figuran, explicá la coherencia entre la señal técnica y la fundamental, y aclará que es un análisis educativo y no una recomendación de inversión. No inventes cifras:\n\n${resultado.texto}`,
+      });
+      enviar({ t: "status", v: "searching" });
+    }
+  }
+
   // El enfoque del coordinador llega al redactor como guía.
   if (enfoque.trim()) {
     messages.push({ role: "user", content: `[Guía del análisis previo] ${enfoque.trim()}` });
@@ -774,6 +829,14 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
       final: texto,
       fuentes,
       ...(textoValoracionFallida ? { textoValoracionFallida } : {}),
+    };
+  }
+
+  // Semáforo fallido: respuesta determinística honesta.
+  if (semaforoFallido) {
+    return {
+      final: semaforoFallidoDetalle || "No se pudo completar el análisis en este momento.",
+      fuentes,
     };
   }
 
