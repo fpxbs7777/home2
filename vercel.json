@@ -3,11 +3,6 @@
   "buildCommand": "vite build",
   "outputDirectory": ".output/public",
   "installCommand": "npm install",
-  "frameworkHeaders": {
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "X-XSS-Protection": "1; mode=block"
-  },
   "redirects": [
     { "source": "/(.*)", "destination": "/index.html", "statusCode": 200 }
   ]
