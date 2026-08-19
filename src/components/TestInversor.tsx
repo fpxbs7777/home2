@@ -12,6 +12,7 @@ import {
   Check,
 } from "lucide-react";
 import { requestOpenChat } from "@/lib/chat-open";
+import { guardarPerfilInversor } from "@/lib/perfil-inversor";
 
 type Opcion = { id: string; label: string; puntos: number };
 type Pregunta = {
@@ -250,8 +251,10 @@ export function TestInversor() {
       if (!op) return sum;
       return sum + op.puntos;
     }, 0);
-    setPerfil(calcularPerfil(pts));
+    const resultado = calcularPerfil(pts);
+    setPerfil(resultado);
     setEtapa("resultado");
+    guardarPerfilInversor({ id: resultado.id, nombre: resultado.nombre });
   };
 
   const preguntasRespondidas = respuestas.filter((r) => r >= 0).length;

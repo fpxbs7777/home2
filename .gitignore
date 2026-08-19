@@ -16,9 +16,16 @@ dist-ssr
 .nitro
 *.local
 
+# Vercel build output
+.vercel/output
+.vercel/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+
+# Memoria de sesión de los agentes (runtime)
+.norte-memoria/
 
 # Editor directories and files
 .vscode/*

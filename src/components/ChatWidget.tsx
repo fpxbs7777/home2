@@ -69,15 +69,16 @@ type Msg = { role: "user" | "assistant"; content: string; sources?: Fuente[] };
 const WELCOME: Msg = {
   role: "assistant",
   content:
-    "Soy **NORTE**, asistente del mercado de capitales argentino. Respondo sobre instrumentos, riesgo y cotizaciones con material académico y fuentes oficiales — y te digo siempre de dónde saqué el dato.\n\nPodés arrancar por acá:\n- ¿Qué es una **obligación negociable** y qué riesgo tiene?\n- Diferencia entre **CEDEAR y ADR**\n- ¿Cómo verifico una **matrícula en la CNV**?\n- Señales típicas de una **estafa financiera**\n- ¿Cómo armo una **cartera en dólares**?\n\nSi el dato es de mercado, lo busco en fuentes reales y te muestro la fuente. Información general. No constituye recomendación de inversión.",
+    "Soy **NORTE**, asistente del mercado de capitales argentino. Respondo sobre instrumentos, riesgo y cotizaciones con material académico y fuentes oficiales — y te digo siempre de dónde saqué el dato.\n\nPodés arrancar por acá:\n- **¿Qué pasa si la acción cae?**\n- Diferencia entre **acciones y CFDs**\n- **¿Tu bróker está regulado por la CNV?**\n- **¿Cómo arranco a invertir?**\n- ONs que se **operan en pesos y pagan en dólares**\n\nSi el dato es de mercado, lo busco en fuentes reales y te muestro la fuente. Información general. No constituye recomendación de inversión.",
 };
 
 const SUGGESTIONS = [
-  "¿Qué es una obligación negociable y qué riesgo tiene?",
-  "¿Cuál es la diferencia entre CEDEAR y ADR?",
-  "¿Cómo verifico una matrícula en la CNV?",
-  "¿Cómo detecto una estafa financiera?",
-  "¿Cómo armo una cartera en dólares?",
+  "¿Qué pasa si la acción cae?",
+  "¿Qué diferencia hay entre acciones y CFDs?",
+  "¿Cómo sé si mi bróker está regulado por la CNV?",
+  "¿Cómo arranco a invertir si recién empiezo?",
+  "¿Qué son las obligaciones negociables que se operan en pesos y pagan en dólares?",
+  "¿Cuánto está el dólar hoy?",
 ];
 
 function isWhatsAppLink(url: string): boolean {
@@ -147,6 +148,7 @@ export function ChatWidget() {
   const [buscandoNoticias, setBuscandoNoticias] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [valorando, setValorando] = useState(false);
+  const [agentesActivos, setAgentesActivos] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const queueRef = useRef<string[]>([]);
@@ -232,8 +234,11 @@ export function ChatWidget() {
     const question = text.trim();
     if (!question) return;
     if (busyRef.current) {
-      queueRef.current = [...queueRef.current, question];
+      // Una pregunta nueva interrumpe la respuesta en curso y arranca primero,
+      // manteniendo el hilo de la conversación.
+      queueRef.current = [question, ...queueRef.current];
       setQueue([...queueRef.current]);
+      abortRef.current?.abort();
       setInput("");
       return;
     }
@@ -261,6 +266,7 @@ export function ChatWidget() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let interrumpido = false;
 
     try {
       const res = await fetch("/api/chat", {
@@ -289,36 +295,54 @@ export function ChatWidget() {
           return;
         }
         if (evt.t === "status") {
-          if (evt.v === "searching") {
+          if (evt.v === "cola") {
+            setSearching(null);
+            setConsultando(false);
+            setBuscandoNoticias(false);
+            setLeyendo(false);
+            setValorando(false);
+          } else if (evt.v === "searching") {
+            setAgentesActivos((prev) => {
+              const sin = prev.filter(
+                (a) => a !== "mercado" && a !== "noticias" && a !== "base" && a !== "valoracion",
+              );
+              return prev.length !== sin.length ? sin : prev;
+            });
             setSearching(evt.q ?? "");
             setConsultando(false);
             setBuscandoNoticias(false);
             setLeyendo(false);
             setValorando(false);
           } else if (evt.v === "mercado") {
-            setConsultando(true);
             setSearching(null);
             setBuscandoNoticias(false);
             setLeyendo(false);
             setValorando(false);
+            setConsultando(true);
+            setAgentesActivos((prev) => (prev.includes("mercado") ? prev : [...prev, "mercado"]));
           } else if (evt.v === "noticias") {
             setBuscandoNoticias(true);
             setSearching(null);
             setConsultando(false);
             setLeyendo(false);
             setValorando(false);
+            setAgentesActivos((prev) => (prev.includes("noticias") ? prev : [...prev, "noticias"]));
           } else if (evt.v === "base_conocimiento") {
             setLeyendo(true);
             setSearching(null);
             setConsultando(false);
             setBuscandoNoticias(false);
             setValorando(false);
+            setAgentesActivos((prev) => (prev.includes("base") ? prev : [...prev, "base"]));
           } else if (evt.v === "valoracion") {
             setValorando(true);
             setSearching(null);
             setConsultando(false);
             setBuscandoNoticias(false);
             setLeyendo(false);
+            setAgentesActivos((prev) =>
+              prev.includes("valoracion") ? prev : [...prev, "valoracion"],
+            );
           } else {
             setSearching(null);
             setConsultando(false);
@@ -335,6 +359,7 @@ export function ChatWidget() {
           setBuscandoNoticias(false);
           setLeyendo(false);
           setValorando(false);
+          setAgentesActivos([]);
           acc += String(evt.v ?? "");
           updateLast({ content: acc });
         }
@@ -351,6 +376,7 @@ export function ChatWidget() {
       if (buffer) handle(buffer);
     } catch (err) {
       const esAbort = err instanceof Error && err.name === "AbortError";
+      interrumpido = esAbort;
       if (!esAbort) {
         const msg =
           err instanceof Error && err.message ? err.message : "No pude responder ahora mismo.";
@@ -365,8 +391,18 @@ export function ChatWidget() {
       setBuscandoNoticias(false);
       setLeyendo(false);
       setValorando(false);
+      setAgentesActivos([]);
       busyRef.current = false;
       setLoading(false);
+      // Si el turno se interrumpió sin respuesta, quitamos la burbuja vacía
+      // para que el hilo continúe limpio con la nueva pregunta.
+      if (interrumpido) {
+        const sinVacios = messagesRef.current.filter(
+          (m) => !(m.role === "assistant" && m.content.trim() === ""),
+        );
+        messagesRef.current = sinVacios;
+        setMessages(sinVacios);
+      }
       // Preguntas en cola: se procesan en orden, manteniendo el hilo acumulado.
       if (queueRef.current.length > 0) {
         const [next, ...rest] = queueRef.current;
@@ -469,10 +505,9 @@ export function ChatWidget() {
               queueRef.current = [];
               setQueue([]);
               try {
-                void fetch(
-                  `/api/chat?sessionId=${encodeURIComponent(obtenerSessionId())}`,
-                  { method: "DELETE" },
-                );
+                void fetch(`/api/chat?sessionId=${encodeURIComponent(obtenerSessionId())}`, {
+                  method: "DELETE",
+                });
               } catch {
                 /* sin backend de memoria */
               }
@@ -590,6 +625,14 @@ export function ChatWidget() {
                   Calculando valor intrínseco con datos reales y buscando noticias…
                 </p>
               )}
+              {agentesActivos.length > 1 && (
+                <p className="flex items-center gap-1.5 text-[12px] text-gold">
+                  <span className="flex h-4 w-4 items-center justify-center">
+                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-gold" />
+                  </span>
+                  {agentesActivos.length} agentes trabajando en paralelo…
+                </p>
+              )}
               {messages.length === 1 && (
                 <div className="flex flex-wrap gap-1.5 pt-2">
                   {SUGGESTIONS.map((s) => (
@@ -597,7 +640,6 @@ export function ChatWidget() {
                       key={s}
                       type="button"
                       onClick={() => void send(s)}
-                      disabled={loading}
                       className="cursor-pointer rounded-full border border-primary/30 bg-primary/[0.07] px-3 py-1.5 text-[11.5px] text-primary transition-colors hover:border-primary hover:bg-primary/15 active:scale-[0.98]"
                     >
                       {s}
@@ -643,7 +685,6 @@ export function ChatWidget() {
                     setModel(v);
                     setModelInfo(obtenerModelo(v));
                   }}
-                  disabled={loading}
                 >
                   <SelectTrigger
                     aria-label="Modelo del asistente"
@@ -715,7 +756,7 @@ export function ChatWidget() {
                   type="submit"
                   disabled={!input.trim()}
                   aria-label="Enviar"
-                  title={loading ? "Se agrega a la cola de preguntas" : "Enviar"}
+                  title={loading ? "Interrumpe la respuesta en curso y envía" : "Enviar"}
                   className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
                 >
                   <Send className="h-4 w-4" />

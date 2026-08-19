@@ -150,7 +150,9 @@ function extraerHechosDePregunta(pregunta: string): string[] {
   if (mCapital) hechos.push("Mencionó contar con poco capital para invertir.");
   const mHorizonte = p.match(/(?:horizonte|corto\s+plazo|largo\s+plazo)/i);
   if (mHorizonte) hechos.push("Mencionó un horizonte de inversión.");
-  const mTolerancia = p.match(/(?:no\s+(?:quiero|puedo)\s+perder|m[ií]nimo\s+riesgo|bajo\s+riesgo|conservad)/i);
+  const mTolerancia = p.match(
+    /(?:no\s+(?:quiero|puedo)\s+perder|m[ií]nimo\s+riesgo|bajo\s+riesgo|conservad)/i,
+  );
   if (mTolerancia) hechos.push("Mencionó baja tolerancia al riesgo.");
   const mCartera = p.match(/cartera\s+en\s+d[óo]lares|dolariz/i);
   if (mCartera) hechos.push("Mostró interés en dolarizar su cartera.");
@@ -241,7 +243,10 @@ export const Route = createFileRoute("/api/chat")({
               });
             } catch (err) {
               console.error("chat error", err);
-              send({ t: "text", v: "\n\n_Se interrumpió la respuesta._" });
+              send({
+                t: "text",
+                v: "_El asistente tuvo un problema transitorio. Podés volver a intentar en unos segundos o escribirle directo a Cintia por WhatsApp._",
+              });
               controller.close();
               return;
             }

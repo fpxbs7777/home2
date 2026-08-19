@@ -12,6 +12,7 @@ import {
   Linkedin,
   ArrowRight,
   Compass,
+  TrendingUp,
 } from "lucide-react";
 import bgImage from "@/assets/market-bg.jpg";
 import balanzLogo from "@/assets/balanz.png";
@@ -22,6 +23,11 @@ import { requestOpenChat } from "@/lib/chat-open";
 import { TestInversor } from "@/components/TestInversor";
 import { ICONOS_INSTRUMENTO, type NombreInstrumento } from "@/components/instrument-icons";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  leerPerfilInversor,
+  suscribirPerfilInversor,
+  type PerfilResultante,
+} from "@/lib/perfil-inversor";
 
 const WHATSAPP =
   "https://wa.me/541162355944?text=Hola%20Cintia%2C%20quiero%20asesoramiento%20sobre%20inversiones";
@@ -109,9 +115,9 @@ export const Route = createFileRoute("/")({
 
 const NAV = [
   { id: "inicio", label: "Inicio" },
-  { id: "servicios", label: "Método" },
-  { id: "instrumentos", label: "Instrumentos" },
   { id: "test-inversor", label: "Perfil" },
+  { id: "instrumentos", label: "Instrumentos" },
+  { id: "servicios", label: "Método" },
   { id: "brokers", label: "Brokers" },
   { id: "preguntas", label: "Preguntas" },
   { id: "alianzas", label: "Alianzas" },
@@ -426,6 +432,21 @@ function Index() {
   const [active, setActive] = useState("inicio");
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [perfilInv, setPerfilInv] = useState<PerfilResultante | null>(null);
+  const [verTodos, setVerTodos] = useState(false);
+
+  useEffect(() => {
+    setPerfilInv(leerPerfilInversor());
+    return suscribirPerfilInversor((p) => {
+      setPerfilInv(p);
+      if (!p) setVerTodos(false);
+    });
+  }, []);
+
+  const instrumentosMostrados =
+    perfilInv && !verTodos
+      ? INSTRUMENTOS.filter((i) => i.perfil === perfilInv.nombre)
+      : INSTRUMENTOS;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -656,6 +677,154 @@ function Index() {
           </div>
         </section>
 
+        {/* ============ TEST DEL INVERSOR ============ */}
+        <section id="test-inversor" className={SECTION}>
+          <div className={CONTAINER}>
+            <SectionHeading
+              label="Perfil"
+              title="Descubrí tu perfil de riesgo"
+              lead="Ocho preguntas, 2 minutos, sin datos personales. Un resultado orientativo para arrancar la conversación con criterio."
+            />
+            <TestInversor />
+          </div>
+        </section>
+
+        {/* ============ INSTRUMENTOS ============ */}
+        <section
+          id="instrumentos"
+          className={`${SECTION} border-y border-border/50 bg-background/15 backdrop-blur-sm`}
+        >
+          <div className={CONTAINER}>
+            <SectionHeading
+              label="Instrumentos"
+              title="Lo que podés operar"
+              lead={
+                <>
+                  Todo se opera en tu cuenta{" "}
+                  <TooltipTerm
+                    term="comitente"
+                    tip="Cuenta a tu nombre en el bróker, donde queda depositado tu dinero y tus títulos."
+                  />
+                  , dentro de un{" "}
+                  <TooltipTerm
+                    term="ALyC"
+                    tip="Agente de Liquidación y Compensación: el bróker registrado en la CNV que ejecuta y liquida tus operaciones."
+                  />{" "}
+                  registrado en la CNV.
+                </>
+              }
+              aiQuestion={PREGUNTA_SECCION.instrumentos}
+            />
+
+            {perfilInv && !verTodos && (
+              <div className="mx-auto mt-10 flex max-w-3xl flex-col items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/[0.07] px-5 py-4 text-center sm:flex-row sm:text-left">
+                <p className="flex items-center gap-2 text-[13.5px] leading-snug text-foreground/90">
+                  <TrendingUp className="h-4 w-4 flex-none text-primary" />
+                  <span>
+                    Desplegando los instrumentos que suelen adaptarse a tu perfil{" "}
+                    <strong className="text-primary">{perfilInv.nombre}</strong>.
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setVerTodos(true)}
+                  className="flex-none rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-[11.5px] font-semibold text-primary transition-colors hover:border-primary hover:bg-primary/15"
+                >
+                  Ver todo el catálogo
+                </button>
+              </div>
+            )}
+            {perfilInv && verTodos && (
+              <div className="mx-auto mt-10 flex max-w-3xl flex-col items-center justify-between gap-3 rounded-2xl border border-border/70 bg-secondary/20 px-5 py-4 text-center sm:flex-row sm:text-left">
+                <p className="flex items-center gap-2 text-[13.5px] leading-snug text-muted-foreground">
+                  <ShieldCheck className="h-4 w-4 flex-none text-primary" />
+                  <span>
+                    Viendo el catálogo completo.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setVerTodos(false)}
+                      className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+                    >
+                      Volver a solo {perfilInv.nombre}
+                    </button>
+                  </span>
+                </p>
+              </div>
+            )}
+            {!perfilInv && (
+              <p className="mx-auto mt-6 max-w-xl text-center text-[12.5px] leading-relaxed text-muted-foreground">
+                Completá el{" "}
+                <a
+                  href="#test-inversor"
+                  className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+                >
+                  Test del Inversor
+                </a>{" "}
+                y este catálogo se despliega automáticamente según tu perfil.
+              </p>
+            )}
+
+            <div className="mt-14 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+              {instrumentosMostrados.map(
+                ({ nombre, que, moneda, perfil, verificar, porque, paraQuien }) => {
+                  const Icon = ICONOS_INSTRUMENTO[nombre];
+                  const withTip = nombre === "CEDEARs";
+                  const label = (
+                    <span className="block text-[15px] font-semibold leading-snug text-foreground">
+                      {withTip ? (
+                        <TooltipTerm
+                          term={nombre}
+                          tip="Certificado que representa acciones de empresas extranjeras y se opera en pesos en la Bolsa local."
+                        />
+                      ) : (
+                        nombre
+                      )}
+                    </span>
+                  );
+                  return (
+                    <button
+                      key={nombre}
+                      type="button"
+                      onClick={() =>
+                        requestOpenChat(
+                          PREGUNTA_INSTRUMENTO[nombre] ?? `Explicame qué son ${nombre}.`,
+                        )
+                      }
+                      title={`Preguntar a NORTE sobre ${nombre}`}
+                      className="surface-card group flex items-start gap-4 rounded-xl px-5 py-5 text-left transition-all hover:border-primary/60 hover:bg-primary/[0.06]"
+                    >
+                      <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#0a0f1a] to-[#151d30] text-gold ring-1 ring-gold/30 transition-colors group-hover:text-primary group-hover:ring-primary/40">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center justify-between gap-2">
+                          {label}
+                          <RiskChip
+                            perfil={perfil}
+                            {...(verificar === true ? { verificar: true } : {})}
+                          />
+                        </span>
+                        <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
+                          {que}
+                        </span>
+                        <span className="mt-1 block text-[11px] uppercase tracking-[0.06em] text-muted-foreground/80">
+                          {moneda}
+                        </span>
+                        <span className="mt-1.5 block text-[12.5px] leading-snug text-foreground/90">
+                          {porque}
+                        </span>
+                        <span className="mt-1.5 block border-l-2 border-gold/40 pl-2 text-[11.5px] leading-snug text-gold/90">
+                          {paraQuien}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                },
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* ============ CÓMO TRABAJAMOS ============ */}
         <section id="servicios" className={SECTION}>
           <div className={CONTAINER}>
@@ -706,101 +875,6 @@ function Index() {
             <p className="mx-auto mt-8 max-w-2xl border-l-2 border-gold/40 pl-4 text-[13px] leading-relaxed text-muted-foreground">
               Delegación opcional. {DELEGACION_NOTE}
             </p>
-          </div>
-        </section>
-
-        {/* ============ INSTRUMENTOS ============ */}
-        <section
-          id="instrumentos"
-          className={`${SECTION} border-y border-border/50 bg-background/15 backdrop-blur-sm`}
-        >
-          <div className={CONTAINER}>
-            <SectionHeading
-              label="Instrumentos"
-              title="Lo que podés operar"
-              lead={
-                <>
-                  Todo se opera en tu cuenta{" "}
-                  <TooltipTerm
-                    term="comitente"
-                    tip="Cuenta a tu nombre en el bróker, donde queda depositado tu dinero y tus títulos."
-                  />
-                  , dentro de un{" "}
-                  <TooltipTerm
-                    term="ALyC"
-                    tip="Agente de Liquidación y Compensación: el bróker registrado en la CNV que ejecuta y liquida tus operaciones."
-                  />{" "}
-                  registrado en la CNV.
-                </>
-              }
-              aiQuestion={PREGUNTA_SECCION.instrumentos}
-            />
-
-            <div className="mt-14 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-              {INSTRUMENTOS.map(({ nombre, que, moneda, perfil, verificar, porque, paraQuien }) => {
-                const Icon = ICONOS_INSTRUMENTO[nombre];
-                const withTip = nombre === "CEDEARs";
-                const label = (
-                  <span className="block text-[15px] font-semibold leading-snug text-foreground">
-                    {withTip ? (
-                      <TooltipTerm
-                        term={nombre}
-                        tip="Certificado que representa acciones de empresas extranjeras y se opera en pesos en la Bolsa local."
-                      />
-                    ) : (
-                      nombre
-                    )}
-                  </span>
-                );
-                return (
-                  <button
-                    key={nombre}
-                    type="button"
-                    onClick={() =>
-                      requestOpenChat(
-                        PREGUNTA_INSTRUMENTO[nombre] ?? `Explicame qué son ${nombre}.`,
-                      )
-                    }
-                    title={`Preguntar a NORTE sobre ${nombre}`}
-                    className="surface-card group flex items-start gap-4 rounded-xl px-5 py-5 text-left transition-all hover:border-primary/60 hover:bg-primary/[0.06]"
-                  >
-                    <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#0a0f1a] to-[#151d30] text-gold ring-1 ring-gold/30 transition-colors group-hover:text-primary group-hover:ring-primary/40">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center justify-between gap-2">
-                        {label}
-                        <RiskChip perfil={perfil} {...(verificar === true ? { verificar: true } : {})} />
-                      </span>
-                      <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
-                        {que}
-                      </span>
-                      <span className="mt-1 block text-[11px] uppercase tracking-[0.06em] text-muted-foreground/80">
-                        {moneda}
-                      </span>
-                      <span className="mt-1.5 block text-[12.5px] leading-snug text-foreground/90">
-                        {porque}
-                      </span>
-                      <span className="mt-1.5 block border-l-2 border-gold/40 pl-2 text-[11.5px] leading-snug text-gold/90">
-                        {paraQuien}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ============ TEST DEL INVERSOR ============ */}
-        <section id="test-inversor" className={SECTION}>
-          <div className={CONTAINER}>
-            <SectionHeading
-              label="Perfil"
-              title="Descubrí tu perfil de riesgo"
-              lead="Ocho preguntas, 2 minutos, sin datos personales. Un resultado orientativo para arrancar la conversación con criterio."
-            />
-            <TestInversor />
           </div>
         </section>
 

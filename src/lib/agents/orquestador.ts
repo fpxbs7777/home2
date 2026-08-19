@@ -14,7 +14,7 @@
 import { ColaDeTareas } from "@/lib/agents/queue";
 import { MemoriaDeSesion } from "@/lib/agents/memory";
 import { AGENTES, obtenerAgente, type RolAgente } from "@/lib/agents/registry";
-import { TOOLS, estadoDeHerramienta } from "@/lib/agents/herramientas";
+import { TOOLS, estadoDeHerramienta, NOMBRE_HERRAMIENTAS } from "@/lib/agents/herramientas";
 import {
   ejecutarMercado,
   ejecutarNoticias,
@@ -123,6 +123,47 @@ type AgentResult = {
   fuentes: FuenteMercado[];
 };
 
+const URL_COMPLETIONS = "https://integrate.api.nvidia.com/v1/chat/completions";
+
+function esperar(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * POST resiliente a chat completions: reintenta fallos de red y 429,
+ * y en el peor caso devuelve un Response "no ok" sin lanzar.
+ * Así un problema transitorio del modelo no interrumpe el turno completo.
+ */
+async function postCompletionsResiliente(
+  apiKey: string,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  let ultimoError: unknown = null;
+  for (let intento = 0; intento < 3; intento++) {
+    try {
+      const res = await fetch(URL_COMPLETIONS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(body),
+      });
+      if (res.status === 429 && intento < 2) {
+        await esperar(600 * (intento + 1));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      ultimoError = err;
+      if (intento < 2) await esperar(500 * (intento + 1));
+    }
+  }
+  return new Response(
+    JSON.stringify({
+      error: ultimoError instanceof Error ? ultimoError.message : String(ultimoError),
+    }),
+    { status: 502, statusText: "Gateway Error" },
+  );
+}
+
 async function llamarModelo(
   apiKey: string,
   modelId: string,
@@ -146,11 +187,7 @@ async function llamarModelo(
       body["tool_choice"] = "auto";
     }
   }
-  return fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify(body),
-  });
+  return postCompletionsResiliente(apiKey, body);
 }
 
 function extraerDatosTool(argsRaw: string): { query: string; periodo: string; simbolo: string } {
@@ -207,6 +244,7 @@ async function trabajarAgente(
   siteContext: string,
   memoria: MemoriaDeSesion,
   orquestacion: ConfiguracionOrquestacion,
+  ragMsg?: ApiMsg,
 ): Promise<AgentResult> {
   const agente = obtenerAgente(rol);
   enviar({ t: "status", v: agente.status, q: pregunta });
@@ -218,6 +256,7 @@ async function trabajarAgente(
   ];
   const ctxMemoria = memoria.contextoMemoria();
   if (ctxMemoria) mensajes.push({ role: "system", content: ctxMemoria });
+  if (ragMsg) mensajes.push(ragMsg);
   mensajes.push(...historial.map((m) => ({ role: m.role, content: m.content })), {
     role: "user",
     content: pregunta,
@@ -424,6 +463,7 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
           siteContext,
           memoria,
           orquestacion,
+          ragMsg,
         ),
       ),
     ),
@@ -497,14 +537,7 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
       }
       body["tools"] = TOOLS;
       body["tool_choice"] = "auto";
-      const planRes = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const planRes = await postCompletionsResiliente(apiKey, body);
       if (!planRes.ok) break;
       const planData = (await planRes.json()) as {
         choices?: Array<{
@@ -587,6 +620,45 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
     }
   } catch {
     /* si falla el coordinador, se sigue con lo que haya */
+  }
+
+  const MARKET_DOMINIOS = [
+    "criptoya.com",
+    "api.argentinadatos.com",
+    "api.bcra.gob.ar",
+    "mercados.ambito.com",
+    "www.portfoliopersonal.com",
+    "byma",
+  ];
+
+  // ---- Red de seguridad 0: pregunta de datos de mercado sin dato obtenido ----
+  const esPreguntaMercado =
+    roles.includes("mercado") &&
+    /d[óo]lar|blue|mep|ccl|riesgo\s+pa[íi]s|uva|inflaci[óo]n|lecap|boncap|letra|plazo\s+fijo|fci|fondo\s+com[úu]n|tasa|badlar|leliq|tm20|pase|cauci[óo]n|euro|cotizaci[óo]n/.test(
+      pregunta.toLowerCase(),
+    );
+  const yaHayDatoMercado = fuentes.some((f) =>
+    MARKET_DOMINIOS.some((d) => f.dominio?.toLowerCase().includes(d)),
+  );
+  if (esPreguntaMercado && !yaHayDatoMercado) {
+    const callId = `mercado_forzado_${Date.now()}`;
+    const args = JSON.stringify({ query: pregunta });
+    messages.push({
+      role: "assistant",
+      content: "",
+      tool_calls: [{ id: callId, function: { name: "consultar_mercado", arguments: args } }],
+    });
+    enviar({ t: "status", v: "mercado", q: pregunta });
+    const resultado = await ejecutarMercado(pregunta);
+    fuentes.push(...resultado.fuentes);
+    if (resultado.fuentes.length) enviar({ t: "sources", v: resultado.fuentes });
+    messages.push({
+      role: "tool",
+      tool_call_id: callId,
+      name: "consultar_mercado",
+      content: `Datos reales de consultar_mercado (fuentes externas):\n\n${resultado.texto}`,
+    });
+    enviar({ t: "status", v: "searching" });
   }
 
   // ---- Red de seguridad 1: causa de movimiento no verificada ----
@@ -705,10 +777,10 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
     };
   }
 
-  // 4) Redactor: respuesta final, sin tools.
+  // 4) Redactor: respuesta final, con acceso a las mismas herramientas.
   const modeloSalida = orquestacion.modeloSalida;
   let final = "";
-  for (let intento = 0; intento < 2; intento++) {
+  for (let intento = 0; intento < 3; intento++) {
     const opcionesInfladas: Record<string, number | boolean> = {
       maxTokens: modeloSalida.maxTokens,
       enableThinking: modeloSalida.enableThinking,
@@ -716,7 +788,13 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
     if (modeloSalida.reasoningBudget !== undefined) {
       opcionesInfladas["reasoningBudget"] = modeloSalida.reasoningBudget;
     }
-    const res = await llamarModelo(apiKey, modeloSalida.id, messages, null, opcionesInfladas);
+    const res = await llamarModelo(
+      apiKey,
+      modeloSalida.id,
+      messages,
+      NOMBRE_HERRAMIENTAS,
+      opcionesInfladas,
+    );
     if (!res.ok) {
       const detalle = await res.text().catch(() => "");
       console.error("AI gateway error", res.status, detalle.slice(0, 500));
@@ -733,9 +811,34 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
       };
     }
     const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{
+        message?: {
+          content?: string;
+          tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
+        };
+      }>;
     };
-    final = (data.choices?.[0]?.message?.content ?? "").trim();
+    const msg = data.choices?.[0]?.message;
+    const calls = msg?.tool_calls ?? [];
+    if (calls.length && intento < 2) {
+      messages.push({ role: "assistant", content: msg?.content ?? "", tool_calls: calls });
+      for (const call of calls) {
+        const name = call.function?.name ?? "buscar_web";
+        const argsRaw = call.function?.arguments ?? "";
+        const ejecucion = await ejecutarTool(name, argsRaw, baseUrl);
+        fuentes.push(...ejecucion.fuentes);
+        if (ejecucion.fuentes.length) enviar({ t: "sources", v: ejecucion.fuentes });
+        messages.push({
+          role: "tool",
+          tool_call_id: call.id ?? "0",
+          name,
+          content: `Datos reales de ${name} (fuentes externas):\n\n${ejecucion.texto}`,
+        });
+        enviar({ t: "status", v: estadoDeHerramienta(name) });
+      }
+      continue;
+    }
+    final = (msg?.content ?? "").trim();
     if (final) break;
   }
 

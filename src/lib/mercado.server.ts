@@ -41,6 +41,14 @@ type Fci = {
   patrimonio?: number | null;
   horizonte?: string | null;
 };
+type Criptopeso = { token?: string | null; entidad?: string | null; tna?: number | null };
+type CotizacionAd = {
+  moneda?: string | null;
+  casa?: string | null;
+  fecha?: string | null;
+  compra?: number | null;
+  venta?: number | null;
+};
 
 async function obtenerJson<T>(url: string, timeout = 8000): Promise<T | null> {
   const controller = new AbortController();
@@ -176,6 +184,75 @@ async function cotizacionDolar(): Promise<{ texto: string; fuentes: FuenteMercad
   return { texto: lineas.join("\n"), fuentes };
 }
 
+/** Cotizaciones del dólar por casa desde ArgentinaDatos (histórico, último valor por casa). Se usa como segunda fuente. */
+async function dolaresArgentinaDatos(): Promise<{
+  texto: string;
+  fuentes: FuenteMercado[];
+}> {
+  const arr = await obtenerJson<CotizacionAd[]>(
+    "https://api.argentinadatos.com/v1/cotizaciones/dolares",
+  );
+  const fuentes = [FUENTE_ARGENTINADATOS];
+  if (!arr?.length) return { texto: "", fuentes };
+  const casas = ["oficial", "blue", "bolsa", "contadoconliqui", "mayorista", "solidario", "turista"];
+  const etiquetas: Record<string, string> = {
+    oficial: "oficial",
+    blue: "blue",
+    bolsa: "MEP (bolsa)",
+    contadoconliqui: "contado con liqui",
+    mayorista: "mayorista",
+    solidario: "solidario",
+    turista: "turista",
+  };
+  const ultimas = casas
+    .map((casa) => {
+      const fila = (arr ?? []).find((c) => c.casa === casa);
+      if (!fila) return null;
+      return { casa, compra: fila.compra, venta: fila.venta, fecha: fila.fecha };
+    })
+    .filter((f): f is NonNullable<typeof f> => f !== null);
+  if (!ultimas.length) return { texto: "", fuentes };
+  const lineas = [
+    "Dólar por casa de cambio (ArgentinaDatos, histórico al día):",
+    ...ultimas.map(
+      (u) =>
+        `- ${etiquetas[u.casa] ?? u.casa}: compra $${txt(u.compra)} / venta $${txt(u.venta)} (${fechaAr(u.fecha)})`,
+    ),
+  ];
+  return { texto: lineas.join("\n"), fuentes };
+}
+
+/** Tasa de interés por depósitos a 30 días (serie BCRA vía ArgentinaDatos). */
+async function depositos30Dias(): Promise<{ texto: string; fuentes: FuenteMercado[] }> {
+  const serie = await obtenerJson<Serie>(
+    "https://api.argentinadatos.com/v1/finanzas/tasas/depositos30Dias",
+  );
+  const fuentes = [FUENTE_ARGENTINADATOS];
+  const ultimo = ultimoValido(serie);
+  if (!ultimo) return { texto: "", fuentes };
+  return {
+    texto: `Tasa de interés por depósitos a 30 días: ${txt(ultimo.valor)}% (dato del ${fechaAr(ultimo.fecha)}, BCRA vía ArgentinaDatos).`,
+    fuentes,
+  };
+}
+
+/** Tasas nominales anuales de criptopesos por entidad (Belo, Ripio, Buenbit, etc.). */
+async function criptopesos(): Promise<{ texto: string; fuentes: FuenteMercado[] }> {
+  const arr = await obtenerJson<Criptopeso[]>(
+    "https://api.argentinadatos.com/v1/finanzas/criptopesos",
+  );
+  const fuentes = [FUENTE_ARGENTINADATOS];
+  if (!arr?.length) return { texto: "", fuentes };
+  const validos = arr.filter((c) => c.entidad && typeof c.tna === "number");
+  if (!validos.length) return { texto: "", fuentes };
+  return {
+    texto: `Tasas de criptopesos (TNA por entidad, ArgentinaDatos):\n${validos
+      .map((c) => `- ${c.entidad} (${c.token ?? "s/d"}): ${txt(c.tna)}% TNA`)
+      .join("\n")}`,
+    fuentes,
+  };
+}
+
 type AmbitoRiesgo = {
   ultimo?: string | null;
   fecha?: string | null;
@@ -184,11 +261,20 @@ type AmbitoRiesgo = {
 };
 
 async function riesgoPais(): Promise<{ texto: string; fuentes: FuenteMercado[] }> {
-  const [ambito, adSerie] = await Promise.all([
+  const [ambito, adSerie, adUltimo] = await Promise.all([
     obtenerJson<AmbitoRiesgo>("https://mercados.ambito.com/riesgopais/variacion"),
     obtenerJson<Serie>("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais"),
+    obtenerJson<{ fecha?: string | null; valor?: number | null }>(
+      "https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo",
+    ),
   ]);
   const validos = (adSerie ?? []).filter((x) => typeof x.valor === "number" && isFinite(x.valor));
+  if (adUltimo && typeof adUltimo.valor === "number" && !ambito?.ultimo) {
+    return {
+      texto: `Riesgo país (EMBI Argentina): ${txtPts(adUltimo.valor)} puntos básicos (dato del ${fechaAr(adUltimo.fecha)}, ArgentinaDatos).`,
+      fuentes: [FUENTE_ARGENTINADATOS],
+    };
+  }
   if (ambito && ambito.ultimo) {
     const ultimo = parseFloat(String(ambito.ultimo).replace(",", "."));
     if (isFinite(ultimo)) {
@@ -435,17 +521,31 @@ export async function consultarMercado(
   if (!raw) return { texto: "", fuentes: [] };
 
   if (
-    /(dolar|blue|mep|ccl|contado |tipo de cambio|oficial|ahorro|tarjeta|solidario|mayorista)/.test(
+    /(dolar|blue|mep|ccl|contado |tipo de cambio|oficial|ahorro|tarjeta|solidario|mayorista|bolsa)/.test(
       raw,
     )
   ) {
-    return cotizacionDolar();
+    const [criptoya, argentinaDatos] = await Promise.all([
+      cotizacionDolar(),
+      dolaresArgentinaDatos(),
+    ]);
+    return {
+      texto: [criptoya.texto, argentinaDatos.texto].filter(Boolean).join("\n\n"),
+      fuentes: [...criptoya.fuentes, ...argentinaDatos.fuentes],
+    };
   }
   if (/(riesgo pais|embi)/.test(raw)) return riesgoPais();
   if (/(\buva\b|unidad de valor adquisitivo)/.test(raw)) return uva();
   if (/(inflacion)/.test(raw)) return inflacion();
   if (/(letra|lecap|boncap)/.test(raw)) return letras(raw);
-  if (/(plazo fijo)/.test(raw)) return plazoFijo();
+  if (/(plazo fijo|deposito|dep[óo]sito)/.test(raw)) {
+    const [pf, dep30] = await Promise.all([plazoFijo(), depositos30Dias()]);
+    return {
+      texto: [pf.texto, dep30.texto].filter(Boolean).join("\n\n"),
+      fuentes: [...pf.fuentes, ...dep30.fuentes],
+    };
+  }
+  if (/(criptopeso|cripto.*peso|argt|wars|usdt.*peso)/.test(raw)) return criptopesos();
   if (/(caucion|cauciones)/.test(raw)) return consultarCaucion30Dias();
   if (
     /(badlar|leliq|tm20|tasa de pase|pases|monetaria|tasa(s)? (del|de) (bcra|banco central)|tasa de interes oficial)/.test(
