@@ -15,6 +15,7 @@ import {
   GripVertical,
   BookOpen,
   Square,
+  Activity,
 } from "lucide-react";
 import { CHAT_OPEN_EVENT_NAME } from "@/lib/chat-open";
 import {
@@ -148,6 +149,7 @@ export function ChatWidget() {
   const [buscandoNoticias, setBuscandoNoticias] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [valorando, setValorando] = useState(false);
+  const [analizandoSemaforo, setAnalizandoSemaforo] = useState(false);
   const [agentesActivos, setAgentesActivos] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -301,10 +303,16 @@ export function ChatWidget() {
             setBuscandoNoticias(false);
             setLeyendo(false);
             setValorando(false);
+            setAnalizandoSemaforo(false);
           } else if (evt.v === "searching") {
             setAgentesActivos((prev) => {
               const sin = prev.filter(
-                (a) => a !== "mercado" && a !== "noticias" && a !== "base" && a !== "valoracion",
+                (a) =>
+                  a !== "mercado" &&
+                  a !== "noticias" &&
+                  a !== "base" &&
+                  a !== "valoracion" &&
+                  a !== "semaforo",
               );
               return prev.length !== sin.length ? sin : prev;
             });
@@ -313,11 +321,13 @@ export function ChatWidget() {
             setBuscandoNoticias(false);
             setLeyendo(false);
             setValorando(false);
+            setAnalizandoSemaforo(false);
           } else if (evt.v === "mercado") {
             setSearching(null);
             setBuscandoNoticias(false);
             setLeyendo(false);
             setValorando(false);
+            setAnalizandoSemaforo(false);
             setConsultando(true);
             setAgentesActivos((prev) => (prev.includes("mercado") ? prev : [...prev, "mercado"]));
           } else if (evt.v === "noticias") {
@@ -326,6 +336,7 @@ export function ChatWidget() {
             setConsultando(false);
             setLeyendo(false);
             setValorando(false);
+            setAnalizandoSemaforo(false);
             setAgentesActivos((prev) => (prev.includes("noticias") ? prev : [...prev, "noticias"]));
           } else if (evt.v === "base_conocimiento") {
             setLeyendo(true);
@@ -333,6 +344,7 @@ export function ChatWidget() {
             setConsultando(false);
             setBuscandoNoticias(false);
             setValorando(false);
+            setAnalizandoSemaforo(false);
             setAgentesActivos((prev) => (prev.includes("base") ? prev : [...prev, "base"]));
           } else if (evt.v === "valoracion") {
             setValorando(true);
@@ -340,8 +352,19 @@ export function ChatWidget() {
             setConsultando(false);
             setBuscandoNoticias(false);
             setLeyendo(false);
+            setAnalizandoSemaforo(false);
             setAgentesActivos((prev) =>
               prev.includes("valoracion") ? prev : [...prev, "valoracion"],
+            );
+          } else if (evt.v === "semaforo") {
+            setAnalizandoSemaforo(true);
+            setSearching(null);
+            setConsultando(false);
+            setBuscandoNoticias(false);
+            setLeyendo(false);
+            setValorando(false);
+            setAgentesActivos((prev) =>
+              prev.includes("semaforo") ? prev : [...prev, "semaforo"],
             );
           } else {
             setSearching(null);
@@ -349,6 +372,7 @@ export function ChatWidget() {
             setBuscandoNoticias(false);
             setLeyendo(false);
             setValorando(false);
+            setAnalizandoSemaforo(false);
           }
         } else if (evt.t === "sources") {
           fuentes = [...fuentes, ...((evt.v as Fuente[]) ?? [])];
@@ -488,7 +512,7 @@ export function ChatWidget() {
           </div>
         )}
         <header className="flex items-center gap-3 border-b border-border px-4 py-3.5">
-          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-gold/60 bg-gradient-to-br from-[#0a0f1a] to-[#141b2e] font-display text-[15px] font-semibold text-gold shadow-[0_0_18px_rgba(201,162,39,0.35)]">
+          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-gold/60 bg-gradient-to-br from-[#0a0f1a] to-[#141b2e] font-display text-[15px] font-semibold text-gold shadow-[0_0_18px_rgba(56,130,246,0.35)]">
             IA
           </span>
           <div className="min-w-0 flex-1">
@@ -623,6 +647,12 @@ export function ChatWidget() {
                 <p className="flex items-center gap-2 text-[12px] text-primary">
                   <Calculator className="h-3.5 w-3.5 animate-pulse" />
                   Calculando valor intrínseco con datos reales y buscando noticias…
+                </p>
+              )}
+              {analizandoSemaforo && (
+                <p className="flex items-center gap-2 text-[12px] text-primary">
+                  <Activity className="h-3.5 w-3.5 animate-pulse" />
+                  Calculando semáforo técnico y fundamental con datos reales…
                 </p>
               )}
               {agentesActivos.length > 1 && (

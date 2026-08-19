@@ -167,7 +167,7 @@ export function SugerenciasSeccion({
           aria-label={`IA sugiere preguntas sobre ${label}`}
           title={`IA sugiere preguntas sobre ${label}`}
           style={{ position: "fixed", left: 0, top: 0, transform: "translate(16px, 96px)" }}
-          className="z-[70] flex h-10 w-10 items-center justify-center rounded-full border border-gold/50 bg-[#0c1222f2] text-gold shadow-[0_8px_30px_rgba(0,0,0,0.45),0_0_0_1px_rgba(201,162,39,0.25)] backdrop-blur-xl transition-[transform] hover:scale-110"
+          className="z-[70] flex h-10 w-10 items-center justify-center rounded-full border border-gold/50 bg-[#0a1020f2] text-gold shadow-[0_8px_30px_rgba(0,0,0,0.45),0_0_0_1px_rgba(56,130,246,0.35)] backdrop-blur-xl transition-[transform] hover:scale-110"
         >
           <Sparkles className="h-4 w-4" />
         </button>
@@ -183,7 +183,7 @@ export function SugerenciasSeccion({
             transform: "translate(16px, 144px)",
             width: ANCHO_CARD,
           }}
-          className="z-[70] overflow-hidden rounded-xl border border-gold/40 bg-gradient-to-b from-[#0c1222f8] to-[#070b16fa] shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+          className="z-[70] overflow-hidden rounded-xl border border-gold/40 bg-gradient-to-b from-[#0a1020f8] to-[#070b16fa] shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl"
         >
           <div className="flex items-center justify-between gap-2 border-b border-gold/20 bg-gold/[0.07] px-3 py-2">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold text-gold">
