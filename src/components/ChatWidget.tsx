@@ -512,7 +512,7 @@ export function ChatWidget() {
           </div>
         )}
         <header className="flex items-center gap-3 border-b border-border px-4 py-3.5">
-          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-gold/60 bg-gradient-to-br from-[#0a0f1a] to-[#141b2e] font-display text-[15px] font-semibold text-gold shadow-[0_0_18px_rgba(56,130,246,0.35)]">
+          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-gold/60 bg-gradient-to-br from-[#0a0f1a] to-[#141b2e] font-display text-[15px] font-semibold text-gold shadow-[0_0_18px_rgba(37,99,235,0.4)]">
             IA
           </span>
           <div className="min-w-0 flex-1">
