@@ -41,7 +41,7 @@ function contenidoInicio(): string {
 }
 
 function contenidoTest(): string {
-  return `Sección Perfil: "Descubrí tu perfil de riesgo". Test del Inversor: 8 preguntas, 2 minutos, sin datos personales. Resultado orientativo (Conservador, Moderado o Agresivo) que orienta qué productos suelen adaptarse mejor a cada perfil de riesgo; la definición final la toma el cliente junto a su asesor.`;
+  return `Sección Perfil: "Conozca su perfil de inversor". Test del Inversor: 8 preguntas, 2 minutos, sin datos personales. Resultado orientativo (Conservador, Moderado o Agresivo) que orienta qué productos suelen adaptarse mejor a cada perfil de riesgo; la definición final la toma el cliente junto a su asesor.`;
 }
 
 function contenidoInstrumentos(
@@ -67,7 +67,7 @@ function contenidoBrokers(): string {
 }
 
 function contenidoPreguntas(): string {
-  return `Sección de preguntas frecuentes ("Lo que más preguntan"):\n${FAQ.map((f) => `P: ${f.q}\nR: ${f.a}`).join(
+  return `Sección de preguntas frecuentes:\n${FAQ.map((f) => `P: ${f.q}\nR: ${f.a}`).join(
     "\n\n",
   )}`;
 }
@@ -138,13 +138,13 @@ const NAV = [
 const CREDIBILIDAD = [
   {
     value: "CNV N° 2192",
-    label: "Matrícula de Agente Productora",
+    label: "Matrícula verificable en el registro público",
     link: CNV_REGISTRO,
-    linkLabel: "Verificá el registro",
+    linkLabel: "Verificar el registro",
   },
-  { value: "3 ALyC", label: "Brokers registrados habilitados" },
-  { value: "Sin costo", label: "Para vos · Ley 26.831" },
-  { value: "Buenos Aires", label: "Argentina · asesoramiento online" },
+  { value: "3 ALyC", label: "Brokers registrados para operar su cuenta" },
+  { value: "Sin costo", label: "Para usted · Conforme Ley 26.831" },
+  { value: "Buenos Aires", label: "Argentina · Asesoramiento online" },
 ];
 
 type PerfilRiesgo = "Conservador" | "Moderado" | "Agresivo";
@@ -286,20 +286,20 @@ const BROKERS = [
 
 const FAQ = [
   {
-    q: "¿Cuánto cuesta esto?",
-    a: "Nada para vos. La actividad se remunera vía el bróker; nunca hay un cargo directo a tu cuenta.",
+    q: "¿Cuánto cuesta este servicio?",
+    a: "No tiene costo directo para usted. La actividad se remunera a través del bróker; nunca se percibe un cargo directo sobre su cuenta.",
   },
   {
-    q: "¿Necesito mucho capital para empezar?",
-    a: "No hay un mínimo. Se empieza con lo que tenés hoy y se ajusta a medida que crece.",
+    q: "¿Se requiere un capital mínimo?",
+    a: "No hay un monto mínimo. Se comienza con el capital disponible y el plan se ajusta a su evolución.",
   },
   {
-    q: "¿Y si no sé nada de inversiones?",
-    a: "El primer paso es un diagnóstico. Partimos de cero, sin presión.",
+    q: "¿Qué sucede si no tengo conocimientos de inversión?",
+    a: "El punto de partida es un diagnóstico. Partimos de cero, sin jerga innecesaria y sin presiones.",
   },
   {
     q: "¿Es seguro operar con un ALyC regulado?",
-    a: "Tu dinero queda siempre en tu cuenta comitente, en el bróker registrado en CNV que elijas.",
+    a: "Su dinero permanece en su cuenta comitente, en el bróker registrado en la CNV que usted elija.",
   },
 ];
 
@@ -496,10 +496,10 @@ function Index() {
 
             <div className="flex items-center gap-2">
               <WhatsAppLink className="hidden items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:inline-flex">
-                Escribime por WhatsApp
+                Consultar por WhatsApp
               </WhatsAppLink>
               <WhatsAppLink
-                aria-label="Escribime por WhatsApp"
+                aria-label="Consultar por WhatsApp"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 sm:hidden"
               >
                 <Phone className="h-4 w-4" />
@@ -533,7 +533,7 @@ function Index() {
                 ))}
               </ul>
               <WhatsAppLink className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-[13px] font-semibold text-primary-foreground">
-                Escribime por WhatsApp
+                Consultar por WhatsApp
               </WhatsAppLink>
             </nav>
           )}
@@ -575,18 +575,19 @@ function Index() {
                 Cintia <em className="italic text-primary">Boos</em>
               </span>
               <span className="mt-2 block text-[clamp(1.5rem,3.5vw,2.4rem)] font-semibold italic text-gold">
-                Tu norte financiero, con criterio
+                Asesoramiento patrimonial con criterio
               </span>
             </h1>
 
             <p className="mt-7 max-w-xl text-[17px] leading-relaxed text-muted-foreground lg:text-[19px]">
-              Asesoramiento patrimonial en Buenos Aires. Criterio, no datos sueltos. Sin costo
-              directo para vos.
+              Asesoramiento patrimonial en Buenos Aires, con una misma consigna: criterio por
+              encima de datos sueltos. La actividad se remunera a través del bróker, sin costo
+              directo para usted.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-3">
               <WhatsAppLink className="inline-flex items-center gap-2.5 rounded-full bg-primary px-7 py-3.5 text-[14px] font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(0,0,0,0.35)] transition-all hover:-translate-y-0.5 hover:bg-primary/90">
-                Escribime por WhatsApp
+                Consultar por WhatsApp
                 <ArrowRight className="h-4 w-4" />
               </WhatsAppLink>
             </div>
@@ -645,8 +646,8 @@ function Index() {
             <div className={CONTAINER}>
               <SectionHeading
                 label="Perfil"
-                title="Descubrí tu perfil de riesgo"
-                lead="Ocho preguntas, 2 minutos, sin datos personales. Un resultado orientativo para arrancar la conversación con criterio."
+                title="Conozca su perfil de inversor"
+                lead="Ocho preguntas y dos minutos para identificar si su perfil es conservador, moderado o agresivo. El resultado es orientativo y sirve como punto de partida de la conversación; la decisión final corresponde siempre a usted, en conjunto con su asesor."
               />
               <TestInversor />
             </div>
@@ -667,20 +668,20 @@ function Index() {
           <div className={CONTAINER}>
             <SectionHeading
               label="Instrumentos"
-              title="Lo que podés operar"
+              title="Instrumentos adecuados a su perfil"
               lead={
                 <>
-                  Todo se opera en tu cuenta{" "}
+                  Todas las operaciones se efectúan en su cuenta{" "}
                   <TooltipTerm
                     term="comitente"
-                    tip="Cuenta a tu nombre en el bróker, donde queda depositado tu dinero y tus títulos."
+                    tip="Cuenta a nombre del cliente en el bróker, donde permanecen depositados sus fondos y títulos."
                   />
-                  , dentro de un{" "}
+                  , en un{" "}
                   <TooltipTerm
                     term="ALyC"
-                    tip="Agente de Liquidación y Compensación: el bróker registrado en la CNV que ejecuta y liquida tus operaciones."
+                    tip="Agente de Liquidación y Compensación: el bróker registrado en la CNV que ejecuta y liquida las operaciones."
                   />{" "}
-                  registrado en la CNV.
+                  registrado en la CNV. Su dinero permanece siempre a su nombre.
                 </>
               }
             />
@@ -690,7 +691,7 @@ function Index() {
                 <p className="flex items-center gap-2 text-[13.5px] leading-snug text-foreground/90">
                   <TrendingUp className="h-4 w-4 flex-none text-primary" />
                   <span>
-                    Desplegando los instrumentos que suelen adaptarse a tu perfil{" "}
+                    Mostrando los instrumentos que suelen adecuarse a su perfil{" "}
                     <strong className="text-primary">{perfilInv.nombre}</strong>.
                   </span>
                 </p>
@@ -699,7 +700,7 @@ function Index() {
                   onClick={() => setVerTodos(true)}
                   className="flex-none rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-[11.5px] font-semibold text-primary transition-colors hover:border-primary hover:bg-primary/15"
                 >
-                  Ver todo el catálogo
+                  Ver el catálogo completo
                 </button>
               </div>
             )}
@@ -708,13 +709,13 @@ function Index() {
                 <p className="flex items-center gap-2 text-[13.5px] leading-snug text-muted-foreground">
                   <ShieldCheck className="h-4 w-4 flex-none text-primary" />
                   <span>
-                    Viendo el catálogo completo.{" "}
+                    Catálogo completo.{" "}
                     <button
                       type="button"
                       onClick={() => setVerTodos(false)}
                       className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
                     >
-                      Volver a solo {perfilInv.nombre}
+                      Volver a {perfilInv.nombre}
                     </button>
                   </span>
                 </p>
@@ -722,14 +723,14 @@ function Index() {
             )}
             {!perfilInv && (
               <p className="mx-auto mt-6 max-w-xl text-center text-[12.5px] leading-relaxed text-muted-foreground">
-                Completá el{" "}
+                Complete el{" "}
                 <a
                   href="#test-inversor"
                   className="font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
                 >
                   Test del Inversor
                 </a>{" "}
-                y este catálogo se despliega automáticamente según tu perfil.
+                y el catálogo se ajustará automáticamente a su perfil.
               </p>
             )}
 
@@ -802,8 +803,8 @@ function Index() {
           <div className={CONTAINER}>
             <SectionHeading
               label="Brokers"
-              title="Opero a través de"
-              lead="Toda operación se ejecuta en tu cuenta comitente, en el bróker registrado en CNV que elijas."
+              title="Operación a través de brokers registrados"
+              lead="Balanz, Inviu e IOL, todos ALyC registrados en la CNV. Usted elige el bróker; su cuenta comitente permanece siempre a su nombre."
             />
 
             <div className="mt-14">
@@ -857,8 +858,8 @@ function Index() {
           <div className={CONTAINER}>
             <SectionHeading
               label="Preguntas"
-              title="Lo que más preguntan"
-              lead="Respuestas directas a las dudas más comunes antes de empezar."
+              title="Preguntas frecuentes"
+              lead="Respuestas a las consultas más habituales antes de comenzar."
               align="center"
             />
 
@@ -879,6 +880,13 @@ function Index() {
                 </details>
               ))}
             </div>
+
+            <div className="mt-10 text-center">
+              <WhatsAppLink className="btn-primary inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-semibold text-primary-foreground">
+                ¿Desea profundizar alguna respuesta? Consulte por WhatsApp
+                <ArrowRight className="h-4 w-4" />
+              </WhatsAppLink>
+            </div>
           </div>
         </section>
         </SugerenciasSeccion>
@@ -898,7 +906,7 @@ function Index() {
             <SectionHeading
               label="Alianzas"
               title="Profesionales de confianza"
-              lead="Servicios complementarios que recomiendo cuando hacen falta."
+              lead="Servicios complementarios brindados por profesionales independientes, ajenos a la actividad regulada por la CNV, cuando el caso lo amerita."
             />
 
             <div className="mx-auto mt-14 max-w-3xl">
@@ -1012,13 +1020,13 @@ function Index() {
           <div className={`${CONTAINER} relative text-center`}>
             <p className="text-[11px] uppercase tracking-[0.24em] text-gold">Primer paso</p>
             <h2 className="mx-auto mt-4 max-w-3xl font-display text-[clamp(2rem,4.5vw,3.4rem)] font-semibold leading-tight">
-              Empecemos por saber dónde estás parado
+              Inicie el proceso con un diagnóstico
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-[17px] leading-relaxed text-muted-foreground lg:text-[18px]">
-              Un diagnóstico sin costo, sin compromiso y sin términos que no te explique antes.
+              Un diagnóstico sin costo, sin compromiso y con términos claros desde el inicio.
             </p>
             <WhatsAppLink className="mt-9 inline-flex items-center gap-2.5 rounded-full bg-primary px-8 py-4 text-[15px] font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(0,0,0,0.35)] transition-all hover:-translate-y-0.5 hover:bg-primary/90">
-              Escribime por WhatsApp
+              Reservar mi diagnóstico por WhatsApp
               <ArrowRight className="h-4 w-4" />
             </WhatsAppLink>
           </div>
@@ -1041,8 +1049,8 @@ function Index() {
                 </span>
               </a>
               <p className="mt-5 max-w-xs text-[14px] leading-relaxed text-muted-foreground">
-                Asesoramiento patrimonial personalizado en Buenos Aires, Argentina. Opero con
-                brokers ALyC registrados en la CNV.
+                Asesoramiento patrimonial en Buenos Aires, Argentina. Las operaciones se efectúan a
+                través de brokers ALyC registrados en la CNV.
               </p>
               <p className="mt-5 flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-gold tabular-nums">
                 <ShieldCheck className="h-4 w-4" />
@@ -1101,7 +1109,7 @@ function Index() {
                     className="inline-flex items-center gap-2 text-muted-foreground transition-colors hover:text-primary"
                   >
                     <ShieldCheck className="h-4 w-4 text-primary" />
-                    Verificá mi matrícula en la CNV
+                    Verificar mi matrícula ante la CNV
                   </a>
                 </li>
               </ul>
@@ -1116,7 +1124,7 @@ function Index() {
                 © 2026 Cintia Boos · Agente Productora CNV · Mat. N° 2192
               </p>
               <p className="text-[10.5px] uppercase tracking-[0.16em] text-gold">
-                Primero verificá el registro. Siempre.
+                Verifique el registro. Siempre.
               </p>
             </div>
           </div>
