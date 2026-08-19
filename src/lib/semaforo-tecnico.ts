@@ -148,14 +148,28 @@ export function analizarMomentum(closes: number[]): { score: number; detalle: st
   const texto: string[] = [];
   if (r != null) {
     let v = 0;
-    if (r < 30) v = 1;
-    else if (r < 40) v = 0.5;
-    else if (r < 50) v = 0;
-    else if (r < 60) v = 0.5;
-    else if (r < 70) v = 1;
-    else v = 0.5; // sobrecompra: momentum alto pero con riesgo de corrección
+    let etiqueta = "neutral";
+    if (r < 30) {
+      v = 1;
+      etiqueta = "sobreventa (probable rebote)";
+    } else if (r < 40) {
+      v = 0.5;
+      etiqueta = "rebote potencial desde zona de sobreventa";
+    } else if (r < 50) {
+      v = 0;
+      etiqueta = "neutral";
+    } else if (r < 60) {
+      v = 0.5;
+      etiqueta = "positivo, con margen antes de la sobrecompra";
+    } else if (r < 70) {
+      v = 1;
+      etiqueta = "fuerte, cercano a sobrecompra";
+    } else {
+      v = 0.5;
+      etiqueta = "sobrecompra (momentum alto con riesgo de corrección)";
+    }
     puntos.push(v);
-    texto.push(`RSI14 ${fmtNum(r, 1)} (${r >= 70 ? "sobrecompra" : r < 30 ? "sobreventa" : v > 0 ? "positivo" : v < 0 ? "negativo" : "neutral"})`);
+    texto.push(`RSI14 ${fmtNum(r, 1)} (${etiqueta})`);
   }
   if (m.hist != null) {
     puntos.push(m.hist > 0 ? 0.5 : -0.5);
@@ -280,6 +294,34 @@ export interface MetricasFundamentales {
   deudaEquity: number | null;
 }
 
+/** Score individual de una métrica fundamental en [-2, 2] (null si no hay dato). */
+export function scoreMetricaFundamental(
+  key: keyof MetricasFundamentales,
+  value: number | null,
+): number | null {
+  if (value == null) return null;
+  switch (key) {
+    case "pe":
+      if (value <= 0) return -1;
+      if (value < 10) return 2;
+      if (value < 18) return 1;
+      if (value < 30) return 0.5;
+      return -0.5;
+    case "revenueGrowth":
+      return value >= 0.3 ? 2 : value >= 0.15 ? 1 : value >= 0 ? 0.5 : value >= -0.1 ? -0.5 : -1;
+    case "profitMargin":
+      return value >= 0.3 ? 2 : value >= 0.15 ? 1 : value >= 0 ? 0.5 : -1;
+    case "roe":
+      return value >= 0.25 ? 2 : value >= 0.15 ? 1 : value >= 0.05 ? 0.5 : value >= 0 ? 0 : -1;
+    case "upside":
+      return value >= 0.3 ? 2 : value >= 0.15 ? 1 : value >= 0.05 ? 0.5 : value >= 0 ? 0 : -1;
+    case "deudaEquity":
+      return value <= 0.5 ? 1 : value <= 1 ? 0.5 : value <= 2 ? 0 : -1;
+    default:
+      return null;
+  }
+}
+
 export function calcularScoreFundamental(m: MetricasFundamentales): {
   score: number | null;
   detalle: string;
@@ -287,38 +329,37 @@ export function calcularScoreFundamental(m: MetricasFundamentales): {
   const tramos: { v: number; texto: string }[] = [];
 
   if (m.pe != null) {
-    let v = 0;
-    if (m.pe <= 0) v = -1;
-    else if (m.pe < 10) v = 2;
-    else if (m.pe < 18) v = 1;
-    else if (m.pe < 30) v = 0.5;
-    else v = -0.5;
-    tramos.push({ v, texto: `P/E ${fmtNum(m.pe, 1)}` });
+    tramos.push({ v: scoreMetricaFundamental("pe", m.pe) ?? 0, texto: `P/E ${fmtNum(m.pe, 1)}` });
   }
   if (m.revenueGrowth != null) {
-    const g = m.revenueGrowth;
-    const v = g >= 0.3 ? 2 : g >= 0.15 ? 1 : g >= 0 ? 0.5 : g >= -0.1 ? -0.5 : -1;
-    tramos.push({ v, texto: `crecimiento de ingresos ${(g * 100).toFixed(1)}%` });
+    tramos.push({
+      v: scoreMetricaFundamental("revenueGrowth", m.revenueGrowth) ?? 0,
+      texto: `crecimiento de ingresos ${(m.revenueGrowth * 100).toFixed(1)}%`,
+    });
   }
   if (m.profitMargin != null) {
-    const p = m.profitMargin;
-    const v = p >= 0.3 ? 2 : p >= 0.15 ? 1 : p >= 0 ? 0.5 : -1;
-    tramos.push({ v, texto: `margen ${(p * 100).toFixed(1)}%` });
+    tramos.push({
+      v: scoreMetricaFundamental("profitMargin", m.profitMargin) ?? 0,
+      texto: `margen ${(m.profitMargin * 100).toFixed(1)}%`,
+    });
   }
   if (m.roe != null) {
-    const r = m.roe;
-    const v = r >= 0.25 ? 2 : r >= 0.15 ? 1 : r >= 0.05 ? 0.5 : r >= 0 ? 0 : -1;
-    tramos.push({ v, texto: `ROE ${(r * 100).toFixed(1)}%` });
+    tramos.push({
+      v: scoreMetricaFundamental("roe", m.roe) ?? 0,
+      texto: `ROE ${(m.roe * 100).toFixed(1)}%`,
+    });
   }
   if (m.upside != null) {
-    const u = m.upside;
-    const v = u >= 0.3 ? 2 : u >= 0.15 ? 1 : u >= 0.05 ? 0.5 : u >= 0 ? 0 : -1;
-    tramos.push({ v, texto: `upside vs consenso ${(u * 100).toFixed(1)}%` });
+    tramos.push({
+      v: scoreMetricaFundamental("upside", m.upside) ?? 0,
+      texto: `upside vs consenso ${(m.upside * 100).toFixed(1)}%`,
+    });
   }
   if (m.deudaEquity != null) {
-    const d = m.deudaEquity;
-    const v = d <= 0.5 ? 1 : d <= 1 ? 0.5 : d <= 2 ? 0 : -1;
-    tramos.push({ v, texto: `deuda/patrimonio ${fmtNum(d, 2)}` });
+    tramos.push({
+      v: scoreMetricaFundamental("deudaEquity", m.deudaEquity) ?? 0,
+      texto: `deuda/patrimonio ${fmtNum(m.deudaEquity, 2)}`,
+    });
   }
 
   if (!tramos.length)

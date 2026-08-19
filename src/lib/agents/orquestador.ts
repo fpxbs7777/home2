@@ -25,6 +25,9 @@ import {
   ejecutarBusqueda,
   validarDCFEnWeb,
   esAcademico,
+  ejecutarDistribucion,
+  ejecutarOptimizarPortafolio,
+  ejecutarFactores,
   type ResultadoConocimiento,
 } from "@/lib/agents/ejecutores";
 import type { ConfiguracionOrquestacion } from "@/lib/model-orchestration";
@@ -86,8 +89,21 @@ function esPreguntaValoracion(pregunta: string): boolean {
 }
 
 function esPreguntaSemaforo(pregunta: string): boolean {
-  return /(?:sem[aá]foro|an[aá]lisis\s+t[eé]cnico|an[aá]lisis\s+t[eé]cnico\s+y\s+fundamental|indicadores\s+t[eé]cnicos|soportes?\s+y\s+resistencias|soporte\s+y\s+resistencia|rsi|macd|medias?\s+m[oó]viles|momentum|se[nñ]al\s+de\s+(?:compra|venta)|conviene\s+(?:comprar|vender)\s+|comprar\s+o\s+vender\s+|an[aá]lisis\s+fundamental\s+de|t[eé]cnico\s+de\s+\w+|qu[eé]\s+me\s+conviene)/i.test(
-    pregunta,
+  const p = pregunta.toLowerCase();
+  // Preguntas educativas o conceptuales NO activan el semáforo (las cubre el agente de conocimiento).
+  if (/qu[eé]\s+es|qu[eé]\s+son|explic[ae]|defin[ií]|significa|curso|aprender|qu[eé]\s+es\s+un|qu[eé]\s+es\s+una|para\s+qu[eé]\s+sirve/.test(p)) {
+    return false;
+  }
+  const conTarget = /(?:rsi|macd|medias?\s+m[óo]viles|indicadores?\s+t[eé]cnicos|soportes?\s+y\s+resistencias|soporte\s+y\s+resistencia|t[eé]cnico)\s+(?:de\s+|del\s+|de\s+la\s+)/.test(p);
+  return (
+    /sem[áa]foro/.test(p) ||
+    /an[áa]lisis\s+t[eé]cnico/.test(p) ||
+    /an[áa]lisis\s+t[eé]cnico\s+y\s+fundamental/.test(p) ||
+    /indicadores\s+t[eé]cnicos/.test(p) ||
+    /soportes?\s+y\s+resistencias|soporte\s+y\s+resistencia/.test(p) ||
+    /conviene\s+(?:comprar|vender)|comprar\s+o\s+vender|se[nñ]al\s+de\s+(?:compra|venta)|qu[eé]\s+me\s+conviene/.test(p) ||
+    /an[áa]lisis\s+fundamental\s+de/.test(p) ||
+    conTarget
   );
 }
 
@@ -242,6 +258,18 @@ async function ejecutarTool(
       const res = await ejecutarSemaforo(argsRaw);
       return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
     }
+    case "estadisticas_retornos": {
+      const res = await ejecutarDistribucion(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "optimizar_portafolio": {
+      const res = await ejecutarOptimizarPortafolio(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "analizar_factores": {
+      const res = await ejecutarFactores(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
     default:
       return { ...(await ejecutarBusqueda(query)), ok: true };
   }
@@ -382,6 +410,23 @@ function extraerTickerPregunta(pregunta: string): string | null {
     "WACC",
     "CAPM",
     "BETA",
+    "RSI",
+    "MACD",
+    "SMA",
+    "EMA",
+    "STOCH",
+    "SOBRE",
+    "INDICADOR",
+    "INDICADORES",
+    "TENDENCIA",
+    "MOMENTUM",
+    "SEMAFORO",
+    "SOPORTES",
+    "SOPORTE",
+    "RESISTENCIAS",
+    "RESISTENCIA",
+    "COMPRA",
+    "VENTA",
     "CALCUALO",
     "CALCULALO",
     "CALCULA",

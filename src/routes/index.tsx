@@ -304,7 +304,7 @@ const FAQ = [
 ];
 
 const CONTAINER = "mx-auto w-full max-w-[1240px] px-5 sm:px-8 lg:px-12";
-const SECTION = "scroll-mt-20 py-24 lg:py-28";
+const SECTION = "scroll-mt-24 py-14 lg:py-20";
 
 function RiskChip({ perfil, verificar }: { perfil: PerfilRiesgo; verificar?: boolean }) {
   const tone =
@@ -330,28 +330,19 @@ function SectionHeading({
   label,
   title,
   lead,
-  align = "left",
 }: {
   label: string;
   title: string;
   lead?: React.ReactNode;
-  align?: "left" | "center";
 }) {
-  const center = align === "center";
   return (
-    <div className={`${center ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}`}>
-      <p
-        className={`text-[11px] uppercase tracking-[0.24em] text-gold ${
-          center ? "justify-center" : ""
-        }`}
-      >
-        {label}
-      </p>
+    <div className="mx-auto max-w-3xl text-center">
+      <p className="text-[11px] uppercase tracking-[0.24em] text-gold">{label}</p>
       <h2 className="mt-4 font-display text-[clamp(1.9rem,4vw,3rem)] font-semibold leading-tight tracking-tight">
         {title}
       </h2>
       {lead && (
-        <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground lg:text-[19px]">
+        <p className="mx-auto mt-5 max-w-2xl text-[17px] leading-relaxed text-muted-foreground lg:text-[19px]">
           {lead}
         </p>
       )}
@@ -444,7 +435,7 @@ function Index() {
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(180deg, rgba(3,5,12,0.9) 0%, rgba(3,5,12,0.6) 40%, rgba(3,5,12,0.75) 100%)",
+                "radial-gradient(56rem 34rem at 82% 8%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 62%), radial-gradient(46rem 30rem at -5% 92%, color-mix(in oklab, var(--accent) 12%, transparent), transparent 60%), linear-gradient(180deg, rgba(6,9,18,0.72) 0%, rgba(6,9,18,0.45) 45%, rgba(6,9,18,0.62) 100%)",
             }}
           />
           <div
@@ -552,7 +543,7 @@ function Index() {
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(180deg, rgba(3,5,12,0.85) 0%, rgba(3,5,12,0.45) 42%, rgba(3,5,12,0.65) 100%)",
+                "radial-gradient(56rem 34rem at 82% 8%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 62%), radial-gradient(46rem 30rem at -5% 92%, color-mix(in oklab, var(--accent) 12%, transparent), transparent 60%), linear-gradient(180deg, rgba(6,9,18,0.72) 0%, rgba(6,9,18,0.45) 45%, rgba(6,9,18,0.62) 100%)",
             }}
           />
           <div
@@ -564,7 +555,7 @@ function Index() {
             }}
           />
 
-          <div className={`${CONTAINER} relative pt-32 pb-20`}>
+          <div className={`${CONTAINER} relative pt-28 pb-16`}>
             <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-gold">
               <ShieldCheck className="h-4 w-4" />
               Agente Productora CNV · Mat. N° 2192
@@ -597,7 +588,7 @@ function Index() {
 
         {/* ============ BARRA DE CREDIBILIDAD ============ */}
         <section className="border-y border-border/50 bg-background/20 backdrop-blur-sm">
-          <div className={`${CONTAINER} py-10 lg:py-12`}>
+          <div className={`${CONTAINER} py-8 lg:py-10`}>
             <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-4 md:divide-x md:divide-border/70">
               {CREDIBILIDAD.map((s) => (
                 <div key={s.label} className="md:px-8">
@@ -663,7 +654,7 @@ function Index() {
         >
         <section
           id="instrumentos"
-          className={`${SECTION} border-y border-border/50 bg-background/15 backdrop-blur-sm`}
+          className={SECTION}
         >
           <div className={CONTAINER}>
             <SectionHeading
@@ -734,7 +725,7 @@ function Index() {
               </p>
             )}
 
-            <div className="mt-14 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-10 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
               {instrumentosMostrados.map(
                 ({ nombre, que, moneda, perfil, verificar, porque, paraQuien }) => {
                   const Icon = ICONOS_INSTRUMENTO[nombre];
@@ -798,7 +789,7 @@ function Index() {
         >
         <section
           id="brokers"
-          className={`${SECTION} border-y border-border/50 bg-background/10 backdrop-blur-sm`}
+          className={SECTION}
         >
           <div className={CONTAINER}>
             <SectionHeading
@@ -807,7 +798,7 @@ function Index() {
               lead="Balanz, Inviu e IOL, todos ALyC registrados en la CNV. Usted elige el bróker; su cuenta comitente permanece siempre a su nombre."
             />
 
-            <div className="mt-14">
+            <div className="mt-10">
               <div className="surface-card overflow-hidden rounded-[2rem]">
                 <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-3 sm:gap-0 sm:p-5">
                   {BROKERS.map((b, i) => (
@@ -860,12 +851,11 @@ function Index() {
               label="Preguntas"
               title="Preguntas frecuentes"
               lead="Respuestas a las consultas más habituales antes de comenzar."
-              align="center"
             />
 
-            <div className="mx-auto mt-14 max-w-3xl">
+            <div className="mx-auto mt-10 max-w-3xl">
               {FAQ.map((f) => (
-                <details key={f.q} className="group border-b border-border/70 py-5">
+                <details key={f.q} className="group border-b border-border/70 py-4">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 marker:hidden">
                     <span className="text-[17px] font-semibold leading-snug lg:text-[19px]">
                       {f.q}
@@ -898,10 +888,7 @@ function Index() {
           contenido={contenidoAlianzas()}
           fallbackPregunta={FALLBACK_SECCION.alianzas}
         >
-        <section
-          id="alianzas"
-          className={`${SECTION} border-t border-border/50 bg-background/10 backdrop-blur-sm`}
-        >
+        <section id="alianzas" className={SECTION}>
           <div className={CONTAINER}>
             <SectionHeading
               label="Alianzas"
@@ -909,7 +896,7 @@ function Index() {
               lead="Servicios complementarios brindados por profesionales independientes, ajenos a la actividad regulada por la CNV, cuando el caso lo amerita."
             />
 
-            <div className="mx-auto mt-14 max-w-3xl">
+            <div className="mx-auto mt-10 max-w-3xl">
               <div className="surface-card overflow-hidden rounded-2xl px-6">
                 <details className="group border-b border-border/70">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 marker:hidden">

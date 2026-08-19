@@ -201,6 +201,233 @@ export const TOOLS: ToolSpec[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "analizar_capm",
+      description:
+        "Calcula el CAPM / beta de un activo contra un benchmark usando datos reales de Yahoo Finance (regresión OLS de retornos diarios): beta, alfa (diario y anualizado), R², correlación, p-valor (significancia), error estándar, exponente de Hurst y beta con p-variance. Si no se indica benchmark, auto-detecta el de mayor R² entre los 140+ factores maestros (sectores US, factors, país, macro, commodities, crypto). Para preguntas como 'cuál es el beta de X', 'beta de SPY vs QQQ', 'riesgo sistemático de X', 'configurá el CAPM de X contra Y', 'compará X contra el MERVAL'. Acepta ticker o nombre (ej. AAPL, GGAL.BA, SPY, QQQ, MSFT).",
+      parameters: {
+        type: "object",
+        properties: {
+          simbolo: {
+            type: "string",
+            description:
+              "Ticker/activo a analizar (ej. 'AAPL', 'QQQ', 'GGAL.BA', 'MSFT', 'SPY').",
+          },
+          benchmark: {
+            type: "string",
+            description:
+              "Benchmark opcional (ej. 'SPY', '^MERV', 'QQQ', 'XLK', 'EWZ'). Si no se indica, se auto-detecta el de mejor R².",
+          },
+          autoDetect: {
+            type: "boolean",
+            description: "Si true (default cuando no hay benchmark), busca el mejor benchmark por R².",
+          },
+          rango: {
+            type: "string",
+            description: "Rango de la serie histórica. Default '2y'. Opciones: 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, max.",
+          },
+        },
+        required: ["simbolo"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "matriz_capm",
+      description:
+        "Calcula la matriz de betas, correlaciones y R² entre varios activos (NxN) usando retornos diarios reales de Yahoo Finance. Para preguntas como 'armá la matriz de beta entre X, Y y Z', 'correlaciones de mi cartera', 'cómo se mueven juntos estos activos'. Acepta tickers o nombres (ej. ['AAPL','MSFT','QQQ','GGAL.BA']).",
+      parameters: {
+        type: "object",
+        properties: {
+          simbolos: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Lista de tickers/activos a comparar entre sí (ej. ['AAPL', 'MSFT', 'QQQ'] o ['GGAL.BA', 'YPF', 'SPY']).",
+          },
+          rango: {
+            type: "string",
+            description: "Rango de la serie histórica. Default '2y'.",
+          },
+        },
+        required: ["simbolos"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "analizar_sectores",
+      description:
+        "Analiza el sector de un activo: detecta su sector (catálogo unificado o quoteSummary de Yahoo), lo compara contra los ETFs sectoriales de EE.UU. (XLK, XLF, XLV, XLE, XLC, XLY, XLP, XLI, XLB, XLRE, XLU) y devuelve beta, R² y correlación de cada uno ordenados por ajuste, más los peers del mismo sector/industria del catálogo. Para preguntas como 'a qué sector pertenece X', 'cómo se comporta X vs su sector', 'perfil sectorial de X', 'benchmark sectorial de X'. Acepta ticker o nombre.",
+      parameters: {
+        type: "object",
+        properties: {
+          simbolo: {
+            type: "string",
+            description:
+              "Ticker o nombre del activo (ej. 'AAPL', 'GGAL.BA', 'MercadoLibre', 'TPSA').",
+          },
+        },
+        required: ["simbolo"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "calcular_cobertura",
+      description:
+        "Calcula el beta del portafolio ponderado por monto en USD y sugiere la cobertura (hedge) contra un benchmark (delta/beta neutral de primer orden): nocional a shortear (o comprar puts) o a comprar según el beta del portafolio. Pide las posiciones y el benchmark opcional. Para preguntas como 'cómo cubro mi cartera', 'hedge de mi portafolio', 'qué beta tiene mi cartera', 'cobertura con SPY/QQQ'. Acepta lista de posición/ticker + valuación en USD.",
+      parameters: {
+        type: "object",
+        properties: {
+          posiciones: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                ticker: { type: "string", description: "Ticker del activo (ej. 'AAPL', 'GGAL.BA', 'SPY')." },
+                valorUSD: { type: "number", description: "Valuación de la posición en USD." },
+              },
+              required: ["ticker", "valorUSD"],
+            },
+            description:
+              "Lista de posiciones con su ticker y valuación en USD (ej. [{ticker:'AAPL',valorUSD:5000},{ticker:'GGAL.BA',valorUSD:3000}]).",
+          },
+          benchmark: {
+            type: "string",
+            description: "Benchmark de cobertura opcional (default 'SPY').",
+          },
+        },
+        required: ["posiciones"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_catalogo",
+      description:
+        "Consulta el catálogo unificado de activos operables (JSON de paneles por sector/industria con ticker, tipo, moneda, mercado y país). Busca por ticker, nombre, sector o industria y devuelve los activos alcanzados, sirviéndose también para resolver el símbolo real de Yahoo Finance. Para preguntas como 'qué activos hay en tecnología', 'paneles de energía', 'cédears de bancos', 'a qué sector pertenece AAPL', 'cuántos ETFs hay'. También útil para conocer el mercado/moneda de un ticker.",
+      parameters: {
+        type: "object",
+        properties: {
+          criterio: {
+            type: "string",
+            description:
+              "Término de búsqueda: ticker, nombre, sector o industria en español (ej. 'tecnología', 'energía', 'bancos', 'AAPL', 'semiconductores', 'CEDEAR').",
+          },
+        },
+        required: ["criterio"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "estadisticas_retornos",
+      description:
+        "Calcula la distribución de los retornos diarios de un activo con series históricas reales de Yahoo Finance (réplica de la clase `distribution` de referencia): retorno medio anualizado (×252), volatilidad anualizada (σ×√252), ratio de Sharpe anual, VaR 95% diario, sesgo (skewness), curtosis en exceso, estadístico de Jarque-Bera, p-valor y si la distribución es normal (p > 0.05). Además valida el resultado con noticias recientes del activo. Para preguntas como 'cómo se distribuyen los retornos de X', 'es normal la distribución de retornos de X', 'VaR de X', 'Sharpe de X', 'cola gruesa', 'skewness y curtosis'. Acepta ticker o nombre.",
+      parameters: {
+        type: "object",
+        properties: {
+          simbolo: {
+            type: "string",
+            description:
+              "Ticker o nombre del activo (ej. 'AAPL', 'GGAL.BA', 'SPY', 'MSFT').",
+          },
+          rango: {
+            type: "string",
+            description: "Rango de la serie histórica. Default '2y'.",
+          },
+        },
+        required: ["simbolo"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "optimizar_portafolio",
+      description:
+        "Optimiza un portafolio con datos reales de Yahoo Finance (réplica de las clases `manager`/`output` y `Hedger` de referencia): matriz de covarianza anualizada (×252), matriz de correlación, estadísticas por activo (retorno anual, vol, Sharpe, VaR95, Jarque-Bera), optimizaciones (equi-weight, volatility-weighted, mínima varianza L1/L2, long-only y Markowitz con target de retorno), frontera eficiente, PCA sobre la covarianza (autovalores, varianza explicada, vector de mínima varianza) y cobertura CAPM contra un benchmark. Valida con noticias recientes del activo principal. Para preguntas como 'optimizá mi portafolio', 'cartera de mínima varianza', 'matriz de covarianza de X, Y, Z', 'frontera eficiente', 'cómo distribuyo entre AAPL y MSFT', 'PCA de mi cartera', 'cuánto ponderar cada activo'. Acepta lista de tickers con montos opcionales.",
+      parameters: {
+        type: "object",
+        properties: {
+          activos: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                ticker: { type: "string", description: "Ticker del activo (ej. 'AAPL', 'GGAL.BA', 'SPY')." },
+                montoUSD: { type: "number", description: "Monto en USD de la posición (opcional, default 10000 por activo)." },
+              },
+              required: ["ticker"],
+            },
+            description:
+              "Lista de activos del portafolio (ej. [{ticker:'AAPL',montoUSD:5000},{ticker:'GGAL.BA',montoUSD:3000}]).",
+          },
+          tipo: {
+            type: "string",
+            description:
+              "Tipo de optimización (opcional, si no va calcula todas): 'equi-weight', 'volatility-weighted', 'min-variance-l1', 'min-variance-l2', 'long-only', 'markowitz'.",
+          },
+          targetReturn: {
+            type: "number",
+            description:
+              "Target de retorno anual (fracción, ej. 0.15) para 'markowitz'. Opcional: default el retorno medio de los activos.",
+          },
+          benchmark: {
+            type: "string",
+            description: "Benchmark de cobertura CAPM. Default 'SPY'.",
+          },
+          rango: {
+            type: "string",
+            description: "Rango de la serie histórica. Default '2y'.",
+          },
+        },
+        required: ["activos"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "analizar_factores",
+      description:
+        "Calcula las correlaciones, betas y R² de un activo contra los factores maestros del corpus de referencia (más de 140: sectores US, factors de estilo, países, macro, commodities, crypto, real estate y temáticos) con series reales de Yahoo Finance, y devuelve las más altas (positivas y negativas). Para preguntas como 'a qué se correlaciona X', 'qué factores explican a X', 'estilo de X', 'X vs petróleo/oro/tech'. Acepta ticker o nombre.",
+      parameters: {
+        type: "object",
+        properties: {
+          simbolo: {
+            type: "string",
+            description: "Ticker o nombre del activo (ej. 'AAPL', 'GGAL.BA', 'MercadoLibre').",
+          },
+          limite: {
+            type: "number",
+            description: "Cantidad máxima de factores a devolver. Default 10.",
+          },
+          rango: {
+            type: "string",
+            description: "Rango de la serie histórica. Default '1y'.",
+          },
+        },
+        required: ["simbolo"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export type EstadoHerramienta =

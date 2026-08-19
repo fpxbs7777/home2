@@ -19,6 +19,7 @@ import {
   calcularScoreTecnico,
   clasificarScore,
   calcularScoreFundamental,
+  scoreMetricaFundamental,
   sma,
   rsi,
   macd,
@@ -315,7 +316,7 @@ export async function analizarSemaforo(consulta: string): Promise<SemaforoResult
     for (const key of ["pe", "revenueGrowth", "profitMargin", "roe", "upside", "deudaEquity"] as const) {
       if (metricas[key] == null) continue;
       const v = metricas[key];
-      let nombre = key;
+      let nombre: string = key;
       let texto = "";
       if (key === "pe") { nombre = "P/E"; texto = `P/E ${fmtNum(v, 1)}`; }
       else if (key === "revenueGrowth") { nombre = "Crecimiento ingresos"; texto = `${((v ?? 0) * 100).toFixed(1)}%`; }
@@ -323,8 +324,7 @@ export async function analizarSemaforo(consulta: string): Promise<SemaforoResult
       else if (key === "roe") { nombre = "ROE"; texto = `${((v ?? 0) * 100).toFixed(1)}%`; }
       else if (key === "upside") { nombre = "Upside vs consenso"; texto = `${((v ?? 0) * 100).toFixed(1)}%`; }
       else { nombre = "Deuda/Patrimonio"; texto = fmtNum(v, 2); }
-      const s = calcularScoreFundamental({ ...metricas, [key]: metricas[key] });
-      signals.push({ nombre, score: s.score, peso: null, detalle: texto });
+      signals.push({ nombre, score: scoreMetricaFundamental(key, v), peso: null, detalle: texto });
     }
 
     // ---- Validación con noticias ----
@@ -382,7 +382,7 @@ export function textoSemaforo(r: SemaforoResult): string {
   L.push(`Precio actual: ${fmtNum(r.precio, 4)} · Datos al: ${r.fechaDatos}`);
   L.push("");
   L.push("ANÁLISIS TÉCNICO");
-  L.push(`- RSI14: ${t.tendencia != null || r.history.rsi != null ? fmtNum(r.history.rsi, 1) : "s/d"} · MACD: ${fmtNum(r.history.macd, 3)} (hist. ${fmtNum(r.history.histMacd, 3)})${r.history.senal != null ? ` · señal MACD ${fmtNum(r.history.senal, 3)}` : ""}`);
+  L.push(`- RSI14: ${fmtNum(r.history.rsi, 1)} · MACD: ${fmtNum(r.history.macd, 3)} (hist. ${fmtNum(r.history.histMacd, 3)})${r.history.senal != null ? ` · señal MACD ${fmtNum(r.history.senal, 3)}` : ""}`);
   L.push(`- SMA20: ${fmtNum(r.history.sma20)} | SMA50: ${fmtNum(r.history.sma50)} | SMA200: ${fmtNum(r.history.sma200)}`);
   L.push(`- Máx 52s: ${fmtNum(r.history.high52)} | Mín 52s: ${fmtNum(r.history.low52)}`);
   L.push(`- ${t.detalle.replace(/\n/g, "\n  ")}`);

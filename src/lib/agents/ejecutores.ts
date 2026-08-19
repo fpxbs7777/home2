@@ -221,3 +221,248 @@ export async function validarDCFEnWeb(
   const query = `${empresa} acción cotización precio actual valor de mercado capitalización`;
   return ejecutarBusqueda(query);
 }
+
+// ---------------------------------------------------------------------------
+// Análisis cuantitativo de portafolios (réplica del corpus de referencia).
+// ---------------------------------------------------------------------------
+
+import { analizarCAPM, matrizCAPM, calcularHedge } from "@/lib/capm-engine";
+import { analisisSectorial, correlacionesBenchmarks } from "@/lib/sector-analysis";
+import { buscarEnCatalogo, activoPorTicker } from "@/lib/catalogo-activos";
+import {
+  analizarPortafolio,
+  tipoPortafolioValidos,
+  tipoPortafolioEspanol,
+  fmtPct,
+  serieDiariaConFechas,
+} from "@/lib/portafolio";
+import { computeDistribucion } from "@/lib/estadisticas";
+import { returns } from "@/lib/stats";
+import { buscarBenchmark } from "@/lib/benchmarks-master";
+
+const ETIQUETAS_TIPO: Record<string, string> = {
+  "min-variance-l1": "Mínima varianza L1 (permite cortos)",
+  "min-variance-l2": "Mínima varianza L2 (normalizado por norma)",
+  "long-only": "Long-only (solo posiciones largas)",
+  markowitz: "Markowitz (target de retorno)",
+  "equi-weight": "Equi-weight (pesos iguales)",
+  "volatility-weighted": "Riesgo inverso (volatility-weighted)",
+};
+
+function pctEtiqueta(t: string): string {
+  return tipoPortafolioEspanol?.(t) ?? ETIQUETAS_TIPO[t] ?? t;
+}
+
+/** Estadísticas de distribución de retornos de un activo (clase `distribution`). */
+export async function ejecutarDistribucion(argsRaw: string): Promise<{
+  texto: string;
+  fuentes: FuenteMercado[];
+  ok: boolean;
+}> {
+  const { simbolo, rango } = (() => {
+    try {
+      return JSON.parse(argsRaw) as { simbolo?: string; rango?: string };
+    } catch {
+      return { simbolo: "", rango: "2y" };
+    }
+  })();
+  const ticker = (simbolo ?? "").trim();
+  if (!ticker) {
+    return {
+      texto:
+        "SIN RESULTADOS: no recibí el símbolo. Reinvocá la herramienta con el parámetro simbolo (ej. 'AAPL', 'GGAL.BA', 'SPY').",
+      fuentes: [],
+      ok: false,
+    };
+  }
+  try {
+    const capm = await analizarCAPM({ simbolo: ticker, rango: rango ?? "2y" });
+    if (capm.error) {
+      return {
+        texto: `RESULTADO DEL TOOL estadisticas_retornos:\nNO se pudo calcular la distribución de ${ticker} (${capm.error}).\nPROHIBIDO inventar estadísticas.`,
+        fuentes: [],
+        ok: false,
+      };
+    }
+    const pts = await serieDiariaConFechas(ticker, rango ?? "2y");
+    const retornos = returns(pts.map((p) => p.close));
+    const d = computeDistribucion(retornos);
+    const nombre = activoPorTicker(ticker)?.nombre ?? ticker;
+    const L: string[] = [];
+    L.push(`Distribución de retornos diarios de ${nombre} (${ticker}) — ${pts.length} obs.`);
+    L.push(`- Retorno media anual: ${fmtPct(d.meanAnnual ?? 0, 2)}`);
+    L.push(`- Volatilidad anual: ${fmtPct(d.volatilityAnnual ?? 0, 2)}`);
+    L.push(`- Sharpe (ann.): ${(d.sharpeRatio ?? 0).toFixed(2)}`);
+    L.push(`- VaR 95% (diario): ${fmtPct(d.var95 ?? 0, 2)}`);
+    L.push(`- Sesgo (skewness): ${(d.skewness ?? 0).toFixed(3)}`);
+    L.push(`- Curtosis (exceso): ${(d.kurtosis ?? 0).toFixed(3)}`);
+    L.push(`- Jarque-Bera: ${(d.jbStat ?? 0).toFixed(2)} (p = ${(d.pValue ?? 0).toFixed(4)})`);
+    L.push(`- Distribución normal: ${d.isNormal ? "SÍ (no se rechaza normalidad)" : "NO (cola gruesa / no normal)"}`);
+    L.push(`\nValidación beta (CAPM): β = ${(capm.beta ?? 0).toFixed(2)} contra ${capm.benchmarkLabel ?? "—"}, R² = ${(capm.rSquared ?? 0).toFixed(2)}.`);
+    const noticias = await consultarNoticias(nombre, "última semana").catch(() => null);
+    if (noticias && noticias.texto) {
+      L.push(`\nValidación con noticias recientes:\n${noticias.texto}`);
+      return { texto: L.join("\n"), fuentes: noticias.fuentes, ok: true };
+    }
+    return { texto: L.join("\n"), fuentes: [], ok: true };
+  } catch (e) {
+    return {
+      texto: `SIN RESULTADOS: error al calcular distribución (${e instanceof Error ? e.message : "desconocido"}).`,
+      fuentes: [],
+      ok: false,
+    };
+  }
+}
+
+/** Optimización de portafolio completa (covarianza, optimizadores, PCA, hedge). */
+export async function ejecutarOptimizarPortafolio(argsRaw: string): Promise<{
+  texto: string;
+  fuentes: FuenteMercado[];
+  ok: boolean;
+}> {
+  let activos: Array<{ ticker: string; montoUSD?: number }> = [];
+  let tipo: string | null = null;
+  let targetReturn: number | undefined;
+  let benchmark = "SPY";
+  let rango = "2y";
+  try {
+    const args = JSON.parse(argsRaw) as {
+      activos?: Array<{ ticker?: string; montoUSD?: number }>;
+      tipo?: string;
+      targetReturn?: number;
+      benchmark?: string;
+      rango?: string;
+    };
+    activos = (args.activos ?? [])
+      .filter((a) => a?.ticker)
+      .map((a) => ({ ticker: String(a.ticker).trim(), montoUSD: a.montoUSD }));
+    tipo = args.tipo?.trim() ? args.tipo.trim() : null;
+    targetReturn = args.targetReturn;
+    benchmark = args.benchmark?.trim() || "SPY";
+    rango = args.rango?.trim() || "2y";
+  } catch {
+    /* sin args */
+  }
+  const tipos: string[] = tipo ? [tipo] : [
+    "equi-weight",
+    "volatility-weighted",
+    "min-variance-l1",
+    "min-variance-l2",
+    "long-only",
+    "markowitz",
+  ];
+  for (const t of tipos) {
+    if (!tipoPortafolioValidos(t)) {
+      return {
+        texto: `SIN RESULTADOS: tipo de optimización inválido "${t}". Usá: min-variance-l1, min-variance-l2, long-only, markowitz, equi-weight, volatility-weighted.`,
+        fuentes: [],
+        ok: false,
+      };
+    }
+  }
+  try {
+    const res = await analizarPortafolio({
+      activos,
+      rango,
+      tipos: tipos as never,
+      targetReturn,
+      benchmark,
+    });
+    const L: string[] = [];
+    L.push(`Portafolio: ${res.simbolos.map((s, i) => `${res.labels[i]} (${s})`).join(", ")}`);
+    L.push(`Rango: ${res.fechas[0]} → ${res.fechas[res.fechas.length - 1]} · ${res.fechas.length} sesiones`);
+    L.push(`\nMatriz de correlación (anualizada):\n  ${res.simbolos.join("\t")}`);
+    res.corr.forEach((row, i) => {
+      L.push(`  ${res.simbolos[i]} ${row.map((c) => c.toFixed(2).padStart(6)).join(" ")}`);
+    });
+    L.push(`\nEstadísticas por activo (retornos diarios):`);
+    res.simbolos.forEach((s, i) => {
+      const d = res.distribucionPorActivo[i]!;
+      L.push(`- ${res.labels[i]} (${s}): anual ${fmtPct(d.meanAnnual ?? 0, 1)} · vol ${fmtPct(d.volatilityAnnual ?? 0, 1)} · Sharpe ${(d.sharpeRatio ?? 0).toFixed(2)} · VaR95 ${fmtPct(d.var95 ?? 0, 1)} · JB p=${(d.pValue ?? 0).toFixed(3)} ${d.isNormal ? "(normal)" : "(no normal)"}`);
+    });
+    L.push(`\nOptimizaciones (pesos):`);
+    for (const t of tipos) {
+      const o = res.optimizaciones[t as keyof typeof res.optimizaciones];
+      if (!o) continue;
+      const pesos = res.simbolos.map((s, i) => `${s} ${fmtPct(o.pesos[s] ?? 0, 1)}`).join(" · ");
+      L.push(`- ${ETIQUETAS_TIPO[t] ?? t}: ${pesos}`);
+      L.push(`  · Retorno ${fmtPct(o.retornoAnual, 1)} · Vol ${fmtPct(o.volatilidadAnual, 1)} · Sharpe ${o.sharpe.toFixed(2)} · VaR95 ${fmtPct(o.var95, 1)}`);
+    }
+    L.push(`\nFrontera eficiente (long-only):`);
+    const fe = res.frontera;
+    if (fe.length) {
+      const minSharpe = fe.reduce((m, p) => (p.sharpe < m.sharpe ? p : m), fe[0]!);
+      const maxSharpe = fe.reduce((m, p) => (p.sharpe > m.sharpe ? p : m), fe[0]!);
+      const minVol = fe.reduce((m, p) => (p.volatilidad < m.volatilidad ? p : m), fe[0]!);
+      L.push(`- Mínima volatilidad: ${fmtPct(minVol.volatilidad, 1)} → retorno ${fmtPct(minVol.retorno, 1)}`);
+      L.push(`- Máximo Sharpe: ${fmtPct(maxSharpe.retorno, 1)} / vol ${fmtPct(maxSharpe.volatilidad, 1)} (Sharpe ${maxSharpe.sharpe.toFixed(2)})`);
+      L.push(`- Peor Sharpe: ${fmtPct(minSharpe.retorno, 1)} / vol ${fmtPct(minSharpe.volatilidad, 1)}`);
+    }
+    L.push(`\nPCA (covarianza anualizada):`);
+    const ev = res.pca.valores.map((v) => v.toFixed(2));
+    L.push(`- Autovalores: ${ev.join(", ")}`);
+    L.push(`- Varianza explicada PC1: ${fmtPct(res.pca.varianzaExplicada[0] ?? 0, 1)} · PC2: ${fmtPct(res.pca.varianzaExplicada[1] ?? 0, 1)}`);
+    L.push(`- Vector de mínima varianza (L2): ${res.simbolos.map((s, i) => `${s} ${(res.pca.vectorMinVarianza[i] ?? 0).toFixed(3)}`).join(" · ")}`);
+    if (res.hedger && "hedges" in res.hedger) {
+      L.push(`\nHedger CAPM contra ${res.hedger.posicion.ticker} (β portafolio ${res.hedger.posicion.beta.toFixed(2)}):`);
+      res.hedger.hedges.forEach((h) => {
+        L.push(`- ${h.name} (${h.ticker}): β=${h.beta.toFixed(2)} · nocional cobertura ${h.nocional >= 0 ? "+" : ""}${h.nocional.toFixed(0)} USD`);
+      });
+      L.push(`- Costo de cobertura: ${res.hedger.cost.toFixed(4)}`);
+    }
+    const noticias = await consultarNoticias(res.labels[0] ?? activos[0]!.ticker, "última semana").catch(() => null);
+    if (noticias && noticias.texto) {
+      L.push(`\nValidación con noticias recientes (${res.labels[0] ?? activos[0]!.ticker}):\n${noticias.texto}`);
+      return { texto: L.join("\n"), fuentes: noticias.fuentes, ok: true };
+    }
+    return { texto: L.join("\n"), fuentes: [], ok: true };
+  } catch (e) {
+    return {
+      texto: `SIN RESULTADOS: error al optimizar portafolio (${e instanceof Error ? e.message : "desconocido"}). Reintentá con menos activos o tickers válidos.`,
+      fuentes: [],
+      ok: false,
+    };
+  }
+}
+
+/** Correlaciones de un activo contra los 140+ factores maestros. */
+export async function ejecutarFactores(argsRaw: string): Promise<{
+  texto: string;
+  fuentes: FuenteMercado[];
+  ok: boolean;
+}> {
+  const { simbolo, limite, rango } = (() => {
+    try {
+      return JSON.parse(argsRaw) as { simbolo?: string; limite?: number; rango?: string };
+    } catch {
+      return { simbolo: "", limite: 10, rango: "1y" };
+    }
+  })();
+  const ticker = (simbolo ?? "").trim();
+  if (!ticker) {
+    return {
+      texto: "SIN RESULTADOS: no recibí el símbolo. Reinvocá con el parámetro simbolo.",
+      fuentes: [],
+      ok: false,
+    };
+  }
+  try {
+    const corr = await correlacionesBenchmarks(ticker, limite ?? 10, rango ?? "1y");
+    if (!corr.length) {
+      return { texto: `SIN RESULTADOS: no hay datos de factores para ${ticker}.`, fuentes: [], ok: false };
+    }
+    const nombre = activoPorTicker(ticker)?.nombre ?? ticker;
+    const L: string[] = [`Correlaciones de ${nombre} (${ticker}) contra los factores maestros (${rango ?? "1y"}):`];
+    corr.forEach((c) => {
+      const signo = c.correlation >= 0 ? "+" : "";
+      L.push(`- ${c.name} (${c.ticker}): r=${signo}${c.correlation.toFixed(2)} · β=${c.beta.toFixed(2)} · R²=${c.rSquared.toFixed(2)}`);
+    });
+    return { texto: L.join("\n"), fuentes: [], ok: true };
+  } catch (e) {
+    return {
+      texto: `SIN RESULTADOS: error al calcular correlaciones (${e instanceof Error ? e.message : "desconocido"}).`,
+      fuentes: [],
+      ok: false,
+    };
+  }
+}
