@@ -16,7 +16,7 @@
  *  - Hedger con función de costo CAPM y solución exacta 2×2.
  */
 
-import { returns, mean, variance } from "./stats";
+import { returns, logReturns, mean, variance, covariance } from "./stats";
 import { fetchYahooChart } from "./yahoo-http";
 import { activoPorTicker } from "./catalogo-activos";
 import { benchmarkPorTicker } from "./benchmarks-master";
@@ -30,10 +30,7 @@ import { computeDistribucion } from "./estadisticas";
 export type PuntoSerie = { fecha: string; close: number };
 
 /** Serie diaria con fecha, normalizada por timestamp de Yahoo. */
-export async function serieDiariaConFechas(
-  simbolo: string,
-  rango = "2y",
-): Promise<PuntoSerie[]> {
+export async function serieDiariaConFechas(simbolo: string, rango = "2y"): Promise<PuntoSerie[]> {
   const chart = await fetchYahooChart(simbolo, rango, "1d");
   const result = chart?.chart?.result?.[0];
   const timestamps = result?.timestamp ?? [];
@@ -103,7 +100,7 @@ export async function sincronizarRetornos(
   for (const s of validos) {
     const closes: number[] = [];
     for (const f of fechasArr) closes.push(series[s]!.get(f)!);
-    retornos[s] = returns(closes);
+    retornos[s] = logReturns(closes);
   }
   return { simbolos: validos, fechas: fechasArr, retornos, errores };
 }
@@ -141,15 +138,14 @@ export function autovaloresJacobi(mat: number[][]): {
   vectors: number[][];
 } {
   const n = mat.length;
-  let a = mat.map((row) => [...row]);
-  let v = Array.from({ length: n }, (_, i) =>
+  const a = mat.map((row) => [...row]);
+  const v: number[][] = Array.from({ length: n }, (_, i) =>
     Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)),
   );
   const eps = 1e-15;
   for (let sweep = 0; sweep < 100; sweep++) {
     let off = 0;
-    for (let i = 0; i < n; i++)
-      for (let j = i + 1; j < n; j++) off += a[i]![j]! * a[i]![j]!;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += a[i]![j]! * a[i]![j]!;
     if (off < eps) break;
     for (let p = 0; p < n - 1; p++) {
       for (let q = p + 1; q < n; q++) {
@@ -246,7 +242,8 @@ export function corrMatriz(retornosPorActivo: number[][]): number[][] {
     for (let j = i; j < n; j++) {
       const si = Math.sqrt(variance(retornosPorActivo[i]!));
       const sj = Math.sqrt(variance(retornosPorActivo[j]!));
-      const c = si > 0 && sj > 0 ? covariance(retornosPorActivo[i]!, retornosPorActivo[j]!) / (si * sj) : 0;
+      const c =
+        si > 0 && sj > 0 ? covariance(retornosPorActivo[i]!, retornosPorActivo[j]!) / (si * sj) : 0;
       corr[i]![j] = c;
       corr[j]![i] = c;
     }
@@ -432,16 +429,16 @@ export function fronteraEficiente(
     const target = minR + ((maxR - minR) * i) / puntos;
     const w = optimizarPesos(cov, retAnuales, "long-only", target);
     const ret = retAnuales.reduce((s, r, j) => s + r * w[j]!, 0);
-    const vol = Math.sqrt(w.reduce((s, wj, j) => s + wj * cov[j]!.reduce((ss, c, k) => ss + c * w[k]!, 0), 0));
+    const vol = Math.sqrt(
+      w.reduce((s, wj, j) => s + wj * cov[j]!.reduce((ss, c, k) => ss + c * w[k]!, 0), 0),
+    );
     out.push({ retorno: ret, volatilidad: vol, sharpe: vol > 0 ? ret / vol : 0 });
   }
   return out;
 }
 
 /** PCA: autovalores, varianza explicada, vector de mínima varianza y PC1/PC2. */
-export function analizarPCA(
-  cov: number[][],
-): {
+export function analizarPCA(cov: number[][]): {
   valores: number[];
   varianzaExplicada: number[];
   vectorMinVarianza: number[];
@@ -555,13 +552,13 @@ export async function calcHedger(
 ): Promise<ResultadoHedger | { error: string }> {
   const serBench = await serieDiariaConFechas(benchmark, rango);
   if (!serBench.length) return { error: `sin datos del benchmark ${benchmark}` };
-  const rb = returns(serBench.map((p) => p.close));
+  const rb = logReturns(serBench.map((p) => p.close));
 
   const betasPos: Array<{ ticker: string; beta: number; delta: number; beta_usd: number }> = [];
   for (const p of posiciones) {
     const ser = await serieDiariaConFechas(p.ticker, rango);
     if (!ser.length) continue;
-    const ra = returns(ser.map((x) => x.close));
+    const ra = logReturns(ser.map((x) => x.close));
     const reg = linregress(rb, ra);
     betasPos.push({
       ticker: p.ticker,
@@ -588,10 +585,10 @@ export async function calcHedger(
   for (const c of candidatos) {
     const ser = await serieDiariaConFechas(c.ticker, rango);
     if (!ser.length) continue;
-    const rh = returns(ser.map((x) => x.close));
+    const rh = logReturns(ser.map((x) => x.close));
     const reg = linregress(rb, rh);
     betasHedge.push(reg.beta);
-    hedges.push({ ticker: c.ticker, name: c.name, beta: reg.beta, peso: 0, nostrál: 0 });
+    hedges.push({ ticker: c.ticker, name: c.name, beta: reg.beta, peso: 0, nocional: 0 });
   }
   if (!hedges.length) return { error: "sin candidatos de cobertura" };
 

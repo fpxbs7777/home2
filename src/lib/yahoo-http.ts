@@ -125,6 +125,7 @@ export interface YahooChartResult {
         currency?: string;
         regularMarketPrice?: number;
         regularMarketTime?: number;
+        chartPreviousClose?: number;
         exchangeName?: string;
         shortName?: string;
         longName?: string;

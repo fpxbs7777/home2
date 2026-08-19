@@ -567,6 +567,20 @@ html {
 }
 
 /* ============ CHAT ASSISTANT MARKDOWN ============ */
+/* El contenedor del chat actúa como size container: el contenido
+   (texto, tablas/df, código, imágenes) se escala con `cqw` y se
+   reacomoda solo al expandir o contraer el panel. */
+.chat-cq {
+  container-type: inline-size;
+  container-name: chat;
+}
+
+.chat-md {
+  overflow-wrap: break-word;
+  min-width: 0;
+  font-size: clamp(12px, 2.8cqw, 15px);
+  line-height: 1.55;
+}
 .chat-md > :first-child {
   margin-top: 0;
 }
@@ -579,6 +593,9 @@ html {
 .chat-md strong {
   color: var(--gold);
   font-weight: 600;
+}
+.chat-md em {
+  color: var(--foreground);
 }
 .chat-md ul,
 .chat-md ol {
@@ -612,4 +629,56 @@ html {
   font-size: 1em;
   font-weight: 600;
   margin: 0 0 0.4em;
+}
+.chat-md blockquote {
+  margin: 0 0 0.6em;
+  border-left: 2px solid color-mix(in oklab, var(--gold) 50%, transparent);
+  padding: 0.1em 0 0.1em 0.7em;
+  color: var(--muted-foreground);
+}
+.chat-md img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+.chat-md pre {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0 0 0.6em;
+  padding: 0.6em 0.75em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--foreground) 4%, transparent);
+}
+.chat-md pre code {
+  background: transparent;
+  padding: 0;
+  font-size: clamp(10px, 2.35cqw, 13px);
+}
+.chat-md table {
+  display: block;
+  max-width: 100%;
+  width: max-content;
+  overflow-x: auto;
+  white-space: nowrap;
+  border-collapse: collapse;
+  margin: 0 0 0.6em;
+  font-size: clamp(9.5px, 2.1cqw, 13px);
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.chat-md th,
+.chat-md td {
+  border: 1px solid var(--border);
+  padding: 0.25em 0.5em;
+  text-align: left;
+  vertical-align: top;
+}
+.chat-md th {
+  background: color-mix(in oklab, var(--gold) 10%, transparent);
+  font-weight: 600;
+  color: var(--gold);
+}
+.chat-md tr {
+  background: color-mix(in oklab, var(--gold) 3%, transparent);
 }

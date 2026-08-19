@@ -196,9 +196,7 @@ export function porSector(sector: string): ActivoCatalogo[] {
   if (!s) return [];
   const exacto = indice().porSector.get(sector);
   if (exacto) return exacto;
-  return [...indice().porSector.entries()].find(([nombre]) => normText(nombre) === s)?.[
-    1
-  ] ?? [];
+  return [...indice().porSector.entries()].find(([nombre]) => normText(nombre) === s)?.[1] ?? [];
 }
 
 /** Activos de una industria puntual. */

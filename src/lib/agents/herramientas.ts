@@ -212,8 +212,7 @@ export const TOOLS: ToolSpec[] = [
         properties: {
           simbolo: {
             type: "string",
-            description:
-              "Ticker/activo a analizar (ej. 'AAPL', 'QQQ', 'GGAL.BA', 'MSFT', 'SPY').",
+            description: "Ticker/activo a analizar (ej. 'AAPL', 'QQQ', 'GGAL.BA', 'MSFT', 'SPY').",
           },
           benchmark: {
             type: "string",
@@ -222,11 +221,13 @@ export const TOOLS: ToolSpec[] = [
           },
           autoDetect: {
             type: "boolean",
-            description: "Si true (default cuando no hay benchmark), busca el mejor benchmark por R².",
+            description:
+              "Si true (default cuando no hay benchmark), busca el mejor benchmark por R².",
           },
           rango: {
             type: "string",
-            description: "Rango de la serie histórica. Default '2y'. Opciones: 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, max.",
+            description:
+              "Rango de la serie histórica. Default '2y'. Opciones: 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, max.",
           },
         },
         required: ["simbolo"],
@@ -293,7 +294,10 @@ export const TOOLS: ToolSpec[] = [
             items: {
               type: "object",
               properties: {
-                ticker: { type: "string", description: "Ticker del activo (ej. 'AAPL', 'GGAL.BA', 'SPY')." },
+                ticker: {
+                  type: "string",
+                  description: "Ticker del activo (ej. 'AAPL', 'GGAL.BA', 'SPY').",
+                },
                 valorUSD: { type: "number", description: "Valuación de la posición en USD." },
               },
               required: ["ticker", "valorUSD"],
@@ -342,8 +346,7 @@ export const TOOLS: ToolSpec[] = [
         properties: {
           simbolo: {
             type: "string",
-            description:
-              "Ticker o nombre del activo (ej. 'AAPL', 'GGAL.BA', 'SPY', 'MSFT').",
+            description: "Ticker o nombre del activo (ej. 'AAPL', 'GGAL.BA', 'SPY', 'MSFT').",
           },
           rango: {
             type: "string",
@@ -369,8 +372,14 @@ export const TOOLS: ToolSpec[] = [
             items: {
               type: "object",
               properties: {
-                ticker: { type: "string", description: "Ticker del activo (ej. 'AAPL', 'GGAL.BA', 'SPY')." },
-                montoUSD: { type: "number", description: "Monto en USD de la posición (opcional, default 10000 por activo)." },
+                ticker: {
+                  type: "string",
+                  description: "Ticker del activo (ej. 'AAPL', 'GGAL.BA', 'SPY').",
+                },
+                montoUSD: {
+                  type: "number",
+                  description: "Monto en USD de la posición (opcional, default 10000 por activo).",
+                },
               },
               required: ["ticker"],
             },
@@ -428,6 +437,30 @@ export const TOOLS: ToolSpec[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "analizar_riesgo",
+      description:
+        "Calcula el riesgo/desvío de un activo con series históricas REALES de Yahoo Finance: desvío estándar diario de retornos (σ), volatilidad anualizada (σ×√252), retorno medio (diario y anualizado), Sharpe, VaR 95% y 99% (histórico), CVaR/Expected Shortfall, máximo drawdown del periodo y beta/R² contra el mejor benchmark entre SPY y MERVAL. Para preguntas como 'calculá el desvío de AAPL', 'cuál es el riesgo/volatilidad de X', 'VaR de mi posición', 'qué tan volátil es X', 'estándar/desviación de X', 'beta de X'. Acepta ticker o nombre (ej. AAPL, GGAL.BA, SPY) y un rango opcional (1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, max; default 2y).",
+      parameters: {
+        type: "object",
+        properties: {
+          simbolo: {
+            type: "string",
+            description: "Ticker o nombre del activo (ej. 'AAPL', 'GGAL.BA', 'SPY', 'MSFT').",
+          },
+          rango: {
+            type: "string",
+            description:
+              "Rango de la serie histórica. Default '2y'. Opciones: 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, max.",
+          },
+        },
+        required: ["simbolo"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export type EstadoHerramienta =
@@ -437,7 +470,10 @@ export type EstadoHerramienta =
   | "base_conocimiento"
   | "dcf"
   | "valoracion"
-  | "semaforo";
+  | "semaforo"
+  | "capm"
+  | "riesgo"
+  | "portafolio";
 
 export function estadoDeHerramienta(name: string): EstadoHerramienta {
   switch (name) {
@@ -453,6 +489,17 @@ export function estadoDeHerramienta(name: string): EstadoHerramienta {
       return "valoracion";
     case "analizar_semaforo":
       return "semaforo";
+    case "analizar_capm":
+    case "matriz_capm":
+    case "analizar_factores":
+    case "estadisticas_retornos":
+      return "capm";
+    case "analizar_sectores":
+    case "calcular_cobertura":
+    case "optimizar_portafolio":
+      return "portafolio";
+    case "analizar_riesgo":
+      return "riesgo";
     default:
       return "searching";
   }

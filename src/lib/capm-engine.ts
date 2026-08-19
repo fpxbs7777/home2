@@ -8,9 +8,14 @@
  */
 
 import { fetchYahooChart } from "./yahoo-http";
-import { returns, mean, variance, covariance, correlation } from "./stats";
+import { returns, logReturns, mean, variance, covariance, correlation } from "./stats";
 import { subyacenteYahoo, activoPorTicker } from "./catalogo-activos";
-import { AUTO_BENCHMARKS, benchmarkPorTicker, SECTOR_ETF_BY_SECTOR_KEY, SECTOR_KEY_BY_ESPANOL } from "./benchmarks-master";
+import {
+  AUTO_BENCHMARKS,
+  benchmarkPorTicker,
+  SECTOR_ETF_BY_SECTOR_KEY,
+  SECTOR_KEY_BY_ESPANOL,
+} from "./benchmarks-master";
 
 // ---------------------------------------------------------------------------
 // Serie histórica de cierres diarios (con fallbacks de host en yahoo-http).
@@ -28,8 +33,9 @@ export async function closesDiarios(simbolo: string, rango = "2y"): Promise<numb
     chart?.chart?.result?.[0]?.meta?.chartPreviousClose ??
     null;
   if (closes.length && typeof ultimo === "number" && isFinite(ultimo) && ultimo > 0) {
-    const prev = closes[closes.length - 1];
-    if (prev != null && Math.abs((ultimo - prev) / prev) > 0.02) closes[closes.length - 1] = ultimo;
+    const prev = (closes[closes.length - 1] as number | null) ?? null;
+    if (prev != null && prev > 0 && Math.abs((ultimo - prev) / prev) > 0.02)
+      closes[closes.length - 1] = ultimo;
   }
   return closes;
 }
@@ -83,7 +89,7 @@ function regularizedIncBeta(a: number, b: number, x: number): number {
   const lbeta = lnBeta(a, b);
   const term = a * Math.log(x) + b * Math.log(1 - x) - lbeta;
   const bt = Math.exp(Math.min(term, 700));
-  return bt * betaCF(a, b, x) / a;
+  return (bt * betaCF(a, b, x)) / a;
 }
 
 function lnBeta(a: number, b: number): number {
@@ -91,17 +97,19 @@ function lnBeta(a: number, b: number): number {
 }
 
 function logGamma(z: number): number {
+  /* eslint-disable no-loss-of-precision */
   const c = [
     76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155,
     0.1208650973866179e-2, -0.5395239384953e-5,
   ];
+  /* eslint-enable no-loss-of-precision */
   if (z < 0.5) return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * z)) - logGamma(1 - z);
   let x = 1;
   z -= 1;
   let y = z + 5.5;
   y -= (z + 0.5) * Math.log(y);
   for (let i = 0; i < 6; i++) x += c[i]! / (z + i + 1);
-  return -y + Math.log(2.5066282746310002 * x / z);
+  return -y + Math.log((2.5066282746310002 * x) / z);
 }
 
 function betaCF(a: number, b: number, x: number, maxIter = 200): number {
@@ -110,20 +118,20 @@ function betaCF(a: number, b: number, x: number, maxIter = 200): number {
   const qap = a + 1;
   const qam = a - 1;
   let c = 1;
-  let d = 1 - qab * x / qap;
+  let d = 1 - (qab * x) / qap;
   if (Math.abs(d) < 1e-30) d = 1e-30;
   d = 1 / d;
   let h = d;
   for (let m = 1; m <= maxIter; m++) {
     const m2 = 2 * m;
-    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
     d = 1 + aa * d;
     if (Math.abs(d) < 1e-30) d = 1e-30;
     c = 1 + aa / c;
     if (Math.abs(c) < 1e-30) c = 1e-30;
     d = 1 / d;
     h *= d * c;
-    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
     d = 1 + aa * d;
     if (Math.abs(d) < 1e-30) d = 1e-30;
     c = 1 + aa / c;
@@ -150,7 +158,15 @@ export interface RegresionOLS {
 export function linregress(x: number[], y: number[]): RegresionOLS {
   const n = Math.min(x.length, y.length);
   if (n < 3) {
-    return { beta: 0, alpha: 0, rSquared: 0, correlation: 0, pValue: 1, stdErr: 0, observations: n };
+    return {
+      beta: 0,
+      alpha: 0,
+      rSquared: 0,
+      correlation: 0,
+      pValue: 1,
+      stdErr: 0,
+      observations: n,
+    };
   }
   const xs = x.slice(-n);
   const ys = y.slice(-n);
@@ -167,7 +183,15 @@ export function linregress(x: number[], y: number[]): RegresionOLS {
     syy += dy * dy;
   }
   if (sxx === 0) {
-    return { beta: 0, alpha: 0, rSquared: 0, correlation: 0, pValue: 1, stdErr: 0, observations: n };
+    return {
+      beta: 0,
+      alpha: 0,
+      rSquared: 0,
+      correlation: 0,
+      pValue: 1,
+      stdErr: 0,
+      observations: n,
+    };
   }
   const beta = sxy / sxx;
   const alpha = my - beta * mx;
@@ -299,8 +323,25 @@ export type OpcionesCAPM = {
 };
 
 const CANDIDATOS_DEFAULT = [
-  "SPY", "^MERV", "QQQ", "XLK", "XLF", "XLV", "XLE", "XLC", "XLY",
-  "XLP", "XLI", "XLB", "XLRE", "XLU", "SHY", "GLD", "USO", "EWZ", "ARGT",
+  "SPY",
+  "^MERV",
+  "QQQ",
+  "XLK",
+  "XLF",
+  "XLV",
+  "XLE",
+  "XLC",
+  "XLY",
+  "XLP",
+  "XLI",
+  "XLB",
+  "XLRE",
+  "XLU",
+  "SHY",
+  "GLD",
+  "USO",
+  "EWZ",
+  "ARGT",
 ];
 
 function nombreBenchmark(ticker: string): string {
@@ -342,7 +383,7 @@ export async function analizarCAPM(opts: OpcionesCAPM): Promise<CAPMResult> {
     out.error = `sin datos históricos de ${simbolo}${asset.error ? ` (${asset.error})` : ""}`;
     return out;
   }
-  const ra = returns(asset.closes);
+  const ra = logReturns(asset.closes);
   const autodetect = opts.autoDetect === true && !opts.benchmark;
   const candidatos = opts.benchmark
     ? [opts.benchmark]
@@ -355,7 +396,7 @@ export async function analizarCAPM(opts: OpcionesCAPM): Promise<CAPMResult> {
     for (const b of candidatos) {
       const serie = await serieActivo(b, rango);
       if (serie.error || serie.closes.length < 20) continue;
-      const rb = returns(serie.closes);
+      const rb = logReturns(serie.closes);
       const reg = linregress(rb, ra);
       if (!mejor || reg.rSquared > mejor.r2) {
         mejor = { ticker: b, r2: reg.rSquared, result: reg };
@@ -377,7 +418,7 @@ export async function analizarCAPM(opts: OpcionesCAPM): Promise<CAPMResult> {
       out.error = `sin datos históricos del benchmark ${bench}`;
       return out;
     }
-    const rb = returns(serie.closes);
+    const rb = logReturns(serie.closes);
     const reg = linregress(rb, ra);
     out.benchmark = bench;
     out.benchmarkLabel = nombreBenchmark(bench);
@@ -407,12 +448,7 @@ function emptyCAPM(simbolo: string, error: string): CAPMResult {
   };
 }
 
-function fillCAPM(
-  out: CAPMResult,
-  reg: RegresionOLS,
-  ra: number[],
-  rb: number[],
-): void {
+function fillCAPM(out: CAPMResult, reg: RegresionOLS, ra: number[], rb: number[]): void {
   out.beta = reg.beta;
   out.alpha = reg.alpha;
   out.annualizedAlpha = anualizarAlpha(reg.alpha);
@@ -452,7 +488,7 @@ export async function matrizCAPM(simbolos: string[], rango = "2y"): Promise<Matr
     else closes[t] = s.closes;
   }
   const rets: Record<string, number[]> = {};
-  for (const t of tickers) if (closes[t]) rets[t] = returns(closes[t]!);
+  for (const t of tickers) if (closes[t]) rets[t] = logReturns(closes[t]!);
   const betaM: Record<string, Record<string, number | null>> = {};
   const corrM: Record<string, Record<string, number | null>> = {};
   const r2M: Record<string, Record<string, number | null>> = {};
@@ -513,7 +549,7 @@ export function hedgeProjectSimplex(v: number[], budget: number): number[] {
   if (k === 0) return new Array(n).fill(0);
   // El algoritmo clásico proyecta sobre simplex unitario positivo; aquí
   // devolvemos pesos crudos recortados a 0 y normalizados.
-  const pesos = w.map((x) => Math.max(0, x - rho) );
+  const pesos = w.map((x) => Math.max(0, x - rho));
   const suma = pesos.reduce((s, x) => s + x, 0);
   return suma > 0 ? pesos.map((p) => (p / suma) * Math.abs(budget)) : pesos;
 }
@@ -541,15 +577,13 @@ export interface ResultadoHedge {
   totalUSD: number;
   benchmark: string;
   benchmarkName: string;
-  hedgeSugerido:
-    | {
-        tipo: "SHORT" | "LONG";
-        ticker: string;
-        name: string;
-        nocionalUSD: number;
-        explicacion: string;
-      }
-    | null;
+  hedgeSugerido: {
+    tipo: "SHORT" | "LONG";
+    ticker: string;
+    name: string;
+    nocionalUSD: number;
+    explicacion: string;
+  } | null;
 }
 
 export type OpcionesHedge = {
@@ -587,7 +621,17 @@ export async function calcularHedge(opts: OpcionesHedge): Promise<ResultadoHedge
 
   let betaPonderado = 0;
   for (const p of posicionesValidas) {
-    const base = { ticker: p.ticker, label: "", valorUSD: p.valorUSD, bhetaRecomendado: null, beta: null, correlation: null, error: null as string | null };
+    const peso = totalUSD > 0 ? p.valorUSD / totalUSD : 0;
+    const base = {
+      ticker: p.ticker,
+      label: "",
+      valorUSD: p.valorUSD,
+      peso,
+      bhetaRecomendado: null,
+      beta: null,
+      correlation: null,
+      error: null as string | null,
+    };
     try {
       const catalogo = activoPorTicker(p.ticker);
       const label = catalogo?.nombre ?? p.ticker;
@@ -598,7 +642,6 @@ export async function calcularHedge(opts: OpcionesHedge): Promise<ResultadoHedge
       }
       const ra = returns(serie.closes);
       const reg = linregress(rb, ra);
-      const peso = totalUSD > 0 ? p.valorUSD / totalUSD : 0;
       const beta = reg.beta;
       if (isFinite(beta)) betaPonderado += peso * beta;
       out.posiciones.push({

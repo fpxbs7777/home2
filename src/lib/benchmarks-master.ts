@@ -7,7 +7,17 @@
 export interface BenchmarkEntry {
   ticker: string;
   name: string;
-  cat: "Macro" | "Bonds" | "Commodities" | "Sectors" | "Factors" | "Countries" | "Real Estate" | "Thematic" | "Crypto" | "AR";
+  cat:
+    | "Macro"
+    | "Bonds"
+    | "Commodities"
+    | "Sectors"
+    | "Factors"
+    | "Countries"
+    | "Real Estate"
+    | "Thematic"
+    | "Crypto"
+    | "AR";
   sub: string;
 }
 
@@ -116,9 +126,7 @@ export const BENCHMARKS_MASTER: BenchmarkEntry[] = E.map(([ticker, name, cat, su
   sub,
 }));
 
-const byTicker = new Map<string, BenchmarkEntry>(
-  BENCHMARKS_MASTER.map((e) => [e.ticker, e]),
-);
+const byTicker = new Map<string, BenchmarkEntry>(BENCHMARKS_MASTER.map((e) => [e.ticker, e]));
 
 /** Ticker base de Ethereum/Bitcoin (pares de Yahoo). */
 export const FACTORS_MASTER_LIST: Record<string, { name: string; cat: string; sub: string }> = {};

@@ -104,8 +104,8 @@ async function caucionesPpi(): Promise<{
     if (!res.ok) return out;
     const body = await res.text();
     for (const m of body.matchAll(/"ticker":"(PESOS\d+)"[\s\S]{0,400}?"lastPrice":([0-9.]+)/g)) {
-      const dias = parseInt(m[1].replace("PESOS", ""), 10);
-      const valor = parseFloat(m[2]);
+      const dias = parseInt((m[1] ?? "").replace("PESOS", ""), 10);
+      const valor = parseFloat(m[2] ?? "");
       if (isFinite(dias) && isFinite(valor) && valor > 0) out.tasas.set(String(dias), valor);
     }
     const q = body.match(/"lastQuote":"([^"]+)"/g)?.pop();

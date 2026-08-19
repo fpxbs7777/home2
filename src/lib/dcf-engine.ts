@@ -35,7 +35,7 @@ export interface ResultadoValuacion {
   pv_terminal?: number;
   valor_empresa?: number;
   valor_patrimonio?: number;
-  valor_por_accion?: number;
+  valor_por_accion?: number | null;
   detalle?: FilaDetalle[];
   sensibilidad?: Array<{ tasa: number; valor: number | null }>;
 }

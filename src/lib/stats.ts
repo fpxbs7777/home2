@@ -1,6 +1,7 @@
 /** Estadísticas de series de precios y cálculo de beta / R² contra un benchmark.
  *  Se comparte entre `market-data.ts` y `yahoo-coronar.functions.ts`. */
 
+/** Retornos simples (aritméticos): r = (p_t − p_{t−1}) / p_{t−1}. */
 export function returns(arr: number[]): number[] {
   const r: number[] = [];
   for (let i = 1; i < arr.length; i++) {
@@ -8,6 +9,19 @@ export function returns(arr: number[]): number[] {
     const cur = arr[i];
     if (typeof prev === "number" && typeof cur === "number" && prev > 0) {
       r.push((cur - prev) / prev);
+    }
+  }
+  return r;
+}
+
+/** Retornos logarítmicos: ln(p_t / p_{t−1}), como el reference `compute_returns`. */
+export function logReturns(arr: number[]): number[] {
+  const r: number[] = [];
+  for (let i = 1; i < arr.length; i++) {
+    const prev = arr[i - 1];
+    const cur = arr[i];
+    if (typeof prev === "number" && typeof cur === "number" && prev > 0 && cur > 0) {
+      r.push(Math.log(cur / prev));
     }
   }
   return r;
@@ -55,11 +69,7 @@ export interface ResultadoBeta {
 }
 
 /** Beta de un activo contra dos benchmarks (SPY y MERVAL): se elige el de mayor R². */
-export function computeBeta(
-  asset: number[],
-  spy: number[],
-  merv: number[],
-): ResultadoBeta {
+export function computeBeta(asset: number[], spy: number[], merv: number[]): ResultadoBeta {
   const ra = returns(asset);
   if (ra.length < 20) return { beta: null, r2: null, benchmark: null, muestras: ra.length };
   const rs = returns(spy);

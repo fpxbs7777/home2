@@ -6,7 +6,11 @@
 
 import { fetchYahooQuoteSummaryJson } from "./yahoo-http";
 import { activoPorTicker, porSector } from "./catalogo-activos";
-import { SECTOR_ETF_BY_SECTOR_KEY, SECTOR_KEY_BY_ESPANOL, BENCHMARKS_MASTER } from "./benchmarks-master";
+import {
+  SECTOR_ETF_BY_SECTOR_KEY,
+  SECTOR_KEY_BY_ESPANOL,
+  BENCHMARKS_MASTER,
+} from "./benchmarks-master";
 import { closesDiarios, linregress } from "./capm-engine";
 import { returns, correlation } from "./stats";
 
@@ -46,7 +50,7 @@ async function sectorDeYahoo(simbolo: string): Promise<SectorInfo> {
     const key = SECTOR_KEY_BY_ESPANOL[out.catalogo.toLowerCase()];
     if (key) out.sectorKey = key;
   }
-  const etf = out.sectorKey ? SECTOR_ETF_BY_SECTOR_KEY[out.sectorKey] ?? null : null;
+  const etf = out.sectorKey ? (SECTOR_ETF_BY_SECTOR_KEY[out.sectorKey] ?? null) : null;
   if (etf) {
     out.etfSector = etf;
     out.etfNombre = BENCHMARKS_MASTER.find((b) => b.ticker === etf)?.name ?? etf;
@@ -154,7 +158,13 @@ export async function correlacionesBenchmarks(
         if (closes.length < 20) continue;
         const rb = returns(closes);
         const corr = correlation(ra, rb);
-        resultados.push({ ticker: b.ticker, name: b.name, beta: null, rSquared: null, correlation: corr });
+        resultados.push({
+          ticker: b.ticker,
+          name: b.name,
+          beta: null,
+          rSquared: null,
+          correlation: corr,
+        });
       } catch {
         /* omitir */
       }

@@ -101,6 +101,26 @@ const SKILLS: Skill[] = [
 - Advertencia honesta: el cálculo cuantitativo con solver GPU (cuOpt) no corre dentro del chat; lo que ofrecés es la interpretación conceptual, los datos reales de mercado y la metodología académica. No prometas pesos óptimos exactos.`,
   },
   {
+    id: "analisis-cuantitativo",
+    nombre: "Análisis Cuantitativo",
+    descripcion:
+      "Cálculos financieros y optimización de carteras con datos reales: CAPM, distribución de retornos, PCA, frontera eficiente y cobertura.",
+    instrucciones: `[SKILL · Análisis Cuantitativo — réplica del motor cuantitativo del Python de referencia]
+- REGLA CENTRAL: NUNCA respondas una consulta cuantitativa con razonamiento genérico suelto. Primero razoná qué cálculos/activos hace falta y LUEGO ejecutá la herramienta que los resuelve con datos reales de Yahoo Finance en este mismo turno.
+- Clasificación y herramienta correspondiente:
+  · "beta de X", "capm", "alpha", "benchmark" → analizar_capm(simbolo) (auto-detecta el mejor benchmark por R²).
+  · matriz de betas/correlaciones entre varios activos → matriz_capm(simbolos[]).
+  · exposición sectorial / "cómo se comporta X vs el sector" → analizar_sectores(simbolo).
+  · distribución de retornos (media anual, volatilidad, Sharpe, VaR 95%, skewness, kurtosis, Jarque-Bera, normalidad) → estadisticas_retornos(simbolo).
+  · optimización (min-varianza, Markowitz, igual-peso, vol-weighted, PCA, frontera eficiente, covarianza) → optimizar_portafolio(activos[{ticker,montoUSD}]).
+  · cobertura / hedge / "cuánto necesito para cubrir X" → calcular_cobertura(posiciones[{ticker,valorUSD}]).
+  · factores de estilo/mercado (momento, calidad, tamaño, países, sectores) → analizar_factores(simbolo).
+  · "¿existe el activo X?", "¿en qué sector está?" → consultar_catalogo(criterio).
+- Formato de los resultados: reportá las cifras calculadas tal cual devuelve la herramienta (beta, R², p-valor, Sharpe, VaR, JB, pesos, PCA), siempre con la fuente de Yahoo Finance y validando con noticias cuando la herramienta las incluya.
+- No inventes ninguna cifra ni pesos: si la herramienta devuelve error o sin datos, decilo con honestidad y ofrecé reintentar.
+- No es recomendación de inversión: los cálculos son informativos y no son consejos de compra/venta.`,
+  },
+  {
     id: "planificacion",
     nombre: "Planificación de Agente",
     descripcion:

@@ -341,9 +341,9 @@ const SUPUESTOS_DEFECTO: Record<string, Supuesto[]> = {
 
 function supuestosPorTema(tema: string): Supuesto[] {
   const t = normalizar(tema);
-  if (/(emergente|pais|mercados emergentes)/.test(t)) return SUPUESTOS_DEFECTO.EMERGENTES ?? [];
-  if (/(capm|beta|costo de capital)/.test(t)) return SUPUESTOS_DEFECTO.CAPM ?? [];
-  return SUPUESTOS_DEFECTO.DCF ?? [];
+  if (/(emergente|pais|mercados emergentes)/.test(t)) return SUPUESTOS_DEFECTO["EMERGENTES"] ?? [];
+  if (/(capm|beta|costo de capital)/.test(t)) return SUPUESTOS_DEFECTO["CAPM"] ?? [];
+  return SUPUESTOS_DEFECTO["DCF"] ?? [];
 }
 
 /** Extrae supuestos mencionados explícitamente en el texto del paper. */

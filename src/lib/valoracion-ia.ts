@@ -9,7 +9,7 @@ import {
   type AnalisisCompleto,
 } from "./valuation-pipeline";
 import { consultarNoticias } from "./noticias.server";
-import { buscar, dominio } from "./search.server";
+import { buscar, dominio, extraerTexto } from "./search.server";
 import type { FuenteMercado } from "./mercado.server";
 
 export interface ResultadoValorIntrinseco {

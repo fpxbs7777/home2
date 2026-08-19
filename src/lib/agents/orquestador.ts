@@ -28,6 +28,12 @@ import {
   ejecutarDistribucion,
   ejecutarOptimizarPortafolio,
   ejecutarFactores,
+  ejecutarCAPM,
+  ejecutarMatrizCAPM,
+  ejecutarSectores,
+  ejecutarCobertura,
+  ejecutarCatalogo,
+  ejecutarRiesgo,
   type ResultadoConocimiento,
 } from "@/lib/agents/ejecutores";
 import type { ConfiguracionOrquestacion } from "@/lib/model-orchestration";
@@ -91,24 +97,71 @@ function esPreguntaValoracion(pregunta: string): boolean {
 function esPreguntaSemaforo(pregunta: string): boolean {
   const p = pregunta.toLowerCase();
   // Preguntas educativas o conceptuales NO activan el semáforo (las cubre el agente de conocimiento).
-  if (/qu[eé]\s+es|qu[eé]\s+son|explic[ae]|defin[ií]|significa|curso|aprender|qu[eé]\s+es\s+un|qu[eé]\s+es\s+una|para\s+qu[eé]\s+sirve/.test(p)) {
+  if (
+    /qu[eé]\s+es|qu[eé]\s+son|explic[ae]|defin[ií]|significa|curso|aprender|qu[eé]\s+es\s+un|qu[eé]\s+es\s+una|para\s+qu[eé]\s+sirve/.test(
+      p,
+    )
+  ) {
     return false;
   }
-  const conTarget = /(?:rsi|macd|medias?\s+m[óo]viles|indicadores?\s+t[eé]cnicos|soportes?\s+y\s+resistencias|soporte\s+y\s+resistencia|t[eé]cnico)\s+(?:de\s+|del\s+|de\s+la\s+)/.test(p);
+  const conTarget =
+    /(?:rsi|macd|medias?\s+m[óo]viles|indicadores?\s+t[eé]cnicos|soportes?\s+y\s+resistencias|soporte\s+y\s+resistencia|t[eé]cnico)\s+(?:de\s+|del\s+|de\s+la\s+)/.test(
+      p,
+    );
   return (
     /sem[áa]foro/.test(p) ||
     /an[áa]lisis\s+t[eé]cnico/.test(p) ||
     /an[áa]lisis\s+t[eé]cnico\s+y\s+fundamental/.test(p) ||
     /indicadores\s+t[eé]cnicos/.test(p) ||
     /soportes?\s+y\s+resistencias|soporte\s+y\s+resistencia/.test(p) ||
-    /conviene\s+(?:comprar|vender)|comprar\s+o\s+vender|se[nñ]al\s+de\s+(?:compra|venta)|qu[eé]\s+me\s+conviene/.test(p) ||
+    /conviene\s+(?:comprar|vender)|comprar\s+o\s+vender|se[nñ]al\s+de\s+(?:compra|venta)|qu[eé]\s+me\s+conviene/.test(
+      p,
+    ) ||
     /an[áa]lisis\s+fundamental\s+de/.test(p) ||
     conTarget
   );
 }
 
+/** Preguntas de análisis cuantitativo: beta/CAPM, matriz, sectores, distribución, portafolio, factores, hedge. */
+function esPreguntaCuantitativa(pregunta: string): boolean {
+  const p = pregunta.toLowerCase();
+  return (
+    /beta|capm|coeficiente\s+beta|riesgo\s+sistem[aá]tico/.test(p) ||
+    /matriz\s+de\s+(?:beta|correlaci[oó]n)/.test(p) ||
+    /correlaci[oó]n|correlaciones|qu[eé]\s+tan\s+relacionad/.test(p) ||
+    /a\s+qu[eé]\s+sector|perfil\s+sectorial|benchmark\s+sectorial/.test(p) ||
+    /distribuci[oó]n\s+de\s+retornos|es\s+normal\b|normalidad|es\s+as[íi]m[ée]tric|jarque|skewness|curtosis|sesgo\b|asimetr[íi]a|cola\s+gruesa|var\s*95|sharpe\b|volatilidad\s+anual/.test(
+      p,
+    ) ||
+    /desv[íi]o\b|desviaci[oó]n\b|volatilidad\b|sigma\b|riesgo\s+de\s+[a-zñáéíóú]+|riesgo\s+del\s+[a-zñáéíóú]+|estandar\b|std\b|drawdown|c[aá]lcula\s+el\s+riesgo|m[aá]ximo\s+drawdown|var\s*99|cvar\b/.test(
+      p,
+    ) ||
+    /optimiz[aá].*portafolio|optimiz[aá].*cartera|m[ií]nima\s+varianza|min.{0,3}variance|frontera\s+eficiente|pesos\s+de\s+(?:la\s+)?cartera|c[oó]mo\s+distribuyo|qu[eé]\s+ponderaci[oó]n|covarianza|matriz\s+de\s+covarianza|markowitz|pca|componentes\s+principales/.test(
+      p,
+    ) ||
+    /cobertura|hedge|cubr\w*\s+(?:la\s+|el\s+|mi\s+)?(?:cartera|portafolio|posiciones?|exposici[oó]n)|neutraliz|hedging/.test(
+      p,
+    ) ||
+    /factores\s+maestros|qu[eé]\s+factores|a\s+qu[eé]\s+se\s+correlaciona|estilo\s+de\s+/.test(p) ||
+    /rebalanceo|ponderaci[oó]n\s+de\s+activos/.test(p)
+  );
+}
+
+/** Preguntas de VERIFICACIÓN de entidades/brokers en el registro de la CNV. */
+function esPreguntaVerificacionCNV(pregunta: string): boolean {
+  const p = pregunta.toLowerCase();
+  const mencionaCNV =
+    /cnv|comisi[oó]n\s+nacional\s+de\s+valores|registro\s+p[úu]blico(\s+de\s+agentes|\s+de\s+productores)?/.test(
+      p,
+    );
+  if (!mencionaCNV) return false;
+  return /matr[íi]cula|regulad|registr|verific|br[oó]?ker|agente\s+de\s+mercado|entidad|habilitad|autorizad|intermedi|inscript|listad|es\s+de\s+confianza/.test(
+    p,
+  );
+}
+
 /** Router: qué agentes especializados corresponden a la pregunta. */
-function enrutar(pregunta: string): Set<RolAgente> {
+export function enrutar(pregunta: string): Set<RolAgente> {
   const p = pregunta.toLowerCase();
   const activos = new Set<RolAgente>();
   if (
@@ -136,6 +189,9 @@ function enrutar(pregunta: string): Set<RolAgente> {
   }
   if (esPreguntaSemaforo(pregunta)) {
     activos.add("semaforo");
+  }
+  if (esPreguntaCuantitativa(pregunta)) {
+    activos.add("cuantitativo");
   }
   if (activos.size === 0) {
     activos.add("conocimiento");
@@ -235,7 +291,7 @@ function extraerDatosTool(argsRaw: string): { query: string; periodo: string; si
   return { query, periodo, simbolo };
 }
 
-async function ejecutarTool(
+export async function ejecutarTool(
   name: string,
   argsRaw: string,
   baseUrl?: string,
@@ -268,6 +324,30 @@ async function ejecutarTool(
     }
     case "analizar_factores": {
       const res = await ejecutarFactores(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "analizar_capm": {
+      const res = await ejecutarCAPM(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "matriz_capm": {
+      const res = await ejecutarMatrizCAPM(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "analizar_sectores": {
+      const res = await ejecutarSectores(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "calcular_cobertura": {
+      const res = await ejecutarCobertura(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "consultar_catalogo": {
+      const res = await ejecutarCatalogo(argsRaw);
+      return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
+    }
+    case "analizar_riesgo": {
+      const res = await ejecutarRiesgo(argsRaw);
       return { texto: res.texto, fuentes: res.fuentes, ok: res.ok };
     }
     default:
@@ -855,6 +935,43 @@ export async function orquestarTurno(opts: OpcionesOrquestador): Promise<Resulta
         tool_call_id: callId,
         name: "analizar_semaforo",
         content: `Semáforo técnico + fundamental con datos reales de Yahoo Finance (RSI, MACD, SMA, soportes/resistencias, anomalía, métricas fundamentales) y noticias de validación (fuentes externas). Presentá los indicadores y métricas tal cual figuran, explicá la coherencia entre la señal técnica y la fundamental, y aclará que es un análisis educativo y no una recomendación de inversión. No inventes cifras:\n\n${resultado.texto}`,
+      });
+      enviar({ t: "status", v: "searching" });
+    }
+  }
+
+  // ---- Red de seguridad 5: verificación de brokers/entidades en la CNV ----
+  if (esPreguntaVerificacionCNV(pregunta)) {
+    const yaVerificado = fuentes.some((f) => f.dominio?.toLowerCase().includes("cnv.gov.ar"));
+    if (!yaVerificado) {
+      const callId = `cnv_verificacion_${Date.now()}`;
+      const argsCnv = JSON.stringify({
+        query: `registro público de agentes y productores de la CNV matrícula ${pregunta}`.slice(
+          0,
+          300,
+        ),
+      });
+      messages.push({
+        role: "assistant",
+        content: "",
+        tool_calls: [{ id: callId, function: { name: "buscar_web", arguments: argsCnv } }],
+      });
+      enviar({ t: "status", v: "searching", q: pregunta });
+      const verificacion = await ejecutarBusqueda(
+        `registro público de agentes y productores de la CNV matrícula ${pregunta}`,
+      ).catch(() => null);
+      if (verificacion && verificacion.fuentes.length) {
+        fuentes.push(...verificacion.fuentes);
+        enviar({ t: "sources", v: verificacion.fuentes });
+      }
+      messages.push({
+        role: "tool",
+        tool_call_id: callId,
+        name: "buscar_web",
+        content: `Datos reales del Registro Público de la CNV (fuentes externas). Usalos para verificar matrículas/regulación: respondé SOLO con lo que aparece acá y citá la fuente.\n\n${
+          verificacion?.texto ??
+          "SIN RESULTADOS: no se pudo verificar la matrícula/regulación en el registro público. Decí que el dato no está confirmado y sugerí verificarlo en cnv.gov.ar."
+        }`,
       });
       enviar({ t: "status", v: "searching" });
     }

@@ -16,6 +16,10 @@ import {
   BookOpen,
   Square,
   Activity,
+  Pencil,
+  RotateCw,
+  Pause,
+  Play,
 } from "lucide-react";
 import { CHAT_OPEN_EVENT_NAME } from "@/lib/chat-open";
 import {
@@ -157,6 +161,12 @@ export function ChatWidget() {
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const messagesRef = useRef<Msg[]>(messages);
+  const streamTokenRef = useRef(0);
+  const pausedRef = useRef(false);
+  const resumeRef = useRef<(() => void) | null>(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -249,21 +259,31 @@ export function ChatWidget() {
 
   /** Procesa una pregunta manteniendo el hilo: usa el historial completo acumulado hasta ese turno. */
   async function process(question: string) {
-    busyRef.current = true;
-    const history = [
-      ...messagesRef.current.filter((m) => m !== WELCOME),
-      { role: "user" as const, content: question },
-    ].map((m) => ({ role: m.role, content: m.content }));
-    const nuevoTurno: Msg[] = [
-      { role: "user", content: question },
-      { role: "assistant", content: "" },
-    ];
+    const q = question.trim();
+    if (!q) return;
     setMessages((prev) => {
-      const next = [...prev, ...nuevoTurno];
+      const next = [...prev, { role: "user" as const, content: q }];
       messagesRef.current = next;
       return next;
     });
     setInput("");
+    await streamTurn();
+  }
+
+  /** Ejecuta un turno de streaming usando el historial ya presente en messagesRef. */
+  async function streamTurn() {
+    const token = ++streamTokenRef.current;
+    busyRef.current = true;
+    pausedRef.current = false;
+    setPaused(false);
+    const history = messagesRef.current
+      .filter((m) => m !== WELCOME && !(m.role === "assistant" && !m.content.trim()))
+      .map((m) => ({ role: m.role, content: m.content }));
+    setMessages((prev) => {
+      const next = [...prev, { role: "assistant" as const, content: "" }];
+      messagesRef.current = next;
+      return next;
+    });
     setLoading(true);
 
     const controller = new AbortController();
@@ -363,9 +383,14 @@ export function ChatWidget() {
             setBuscandoNoticias(false);
             setLeyendo(false);
             setValorando(false);
-            setAgentesActivos((prev) =>
-              prev.includes("semaforo") ? prev : [...prev, "semaforo"],
-            );
+            setAgentesActivos((prev) => (prev.includes("semaforo") ? prev : [...prev, "semaforo"]));
+          } else if (evt.v === "capm" || evt.v === "portafolio" || evt.v === "riesgo") {
+            setSearching(evt.q ?? "");
+            setConsultando(false);
+            setBuscandoNoticias(false);
+            setLeyendo(false);
+            setValorando(false);
+            setAnalizandoSemaforo(false);
           } else {
             setSearching(null);
             setConsultando(false);
@@ -390,6 +415,12 @@ export function ChatWidget() {
       };
 
       for (;;) {
+        if (pausedRef.current) {
+          await new Promise<void>((resolve) => {
+            resumeRef.current = resolve;
+          });
+          resumeRef.current = null;
+        }
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -408,43 +439,128 @@ export function ChatWidget() {
           content: `${msg}\n\nPodés escribirle directo a Cintia por [WhatsApp](${WHATSAPP}).`,
         });
       }
-    } finally {
-      abortRef.current = null;
-      setSearching(null);
-      setConsultando(false);
-      setBuscandoNoticias(false);
-      setLeyendo(false);
-      setValorando(false);
-      setAgentesActivos([]);
-      busyRef.current = false;
-      setLoading(false);
-      // Si el turno se interrumpió sin respuesta, quitamos la burbuja vacía
-      // para que el hilo continúe limpio con la nueva pregunta.
-      if (interrumpido) {
-        const sinVacios = messagesRef.current.filter(
-          (m) => !(m.role === "assistant" && m.content.trim() === ""),
-        );
-        messagesRef.current = sinVacios;
-        setMessages(sinVacios);
-      }
-      // Preguntas en cola: se procesan en orden, manteniendo el hilo acumulado.
-      if (queueRef.current.length > 0) {
-        const [next, ...rest] = queueRef.current;
-        queueRef.current = rest;
-        setQueue(rest);
-        void process(next!);
-      }
+    }
+
+    if (token !== streamTokenRef.current) {
+      // Este turno fue superado por otro (editar/regenerar/reenviar): no tocar estado global.
+      return;
+    }
+    abortRef.current = null;
+    resumeRef.current = null;
+    pausedRef.current = false;
+    setPaused(false);
+    setSearching(null);
+    setConsultando(false);
+    setBuscandoNoticias(false);
+    setLeyendo(false);
+    setValorando(false);
+    setAgentesActivos([]);
+    busyRef.current = false;
+    setLoading(false);
+    // Si el turno se interrumpió sin respuesta, quitamos la burbuja vacía
+    // para que el hilo continúe limpio con la nueva pregunta.
+    if (interrumpido) {
+      const sinVacios = messagesRef.current.filter(
+        (m) => !(m.role === "assistant" && m.content.trim() === ""),
+      );
+      messagesRef.current = sinVacios;
+      setMessages(sinVacios);
+    }
+    // Preguntas en cola: se procesan en orden, manteniendo el hilo acumulado.
+    if (queueRef.current.length > 0) {
+      const [next, ...rest] = queueRef.current;
+      queueRef.current = rest;
+      setQueue(rest);
+      void process(next!);
     }
   }
 
   /** Interrumpe la respuesta en curso. La siguiente pregunta en cola arranca de inmediato. */
   function cancelCurrent() {
+    if (pausedRef.current) {
+      pausedRef.current = false;
+      setPaused(false);
+      resumeRef.current?.();
+      resumeRef.current = null;
+    }
     abortRef.current?.abort();
+  }
+
+  /** Pausa o reanuda la respuesta en curso (el stream sigue en el navegador y se retoma donde iba). */
+  function togglePause() {
+    if (pausedRef.current) {
+      pausedRef.current = false;
+      setPaused(false);
+      resumeRef.current?.();
+      resumeRef.current = null;
+    } else {
+      pausedRef.current = true;
+      setPaused(true);
+    }
   }
 
   function limpiarCola() {
     queueRef.current = [];
     setQueue([]);
+  }
+
+  function startEdit(index: number) {
+    const m = messagesRef.current[index];
+    if (!m || m.role !== "user") return;
+    setEditingIdx(index);
+    setEditText(m.content);
+  }
+
+  function cancelEdit() {
+    setEditingIdx(null);
+    setEditText("");
+  }
+
+  /** Guarda el mensaje editado y regenera la respuesta desde ese punto. */
+  function saveEdit() {
+    const text = editText.trim();
+    const index = editingIdx ?? -1;
+    cancelEdit();
+    const prev = messagesRef.current;
+    const original = prev[index];
+    if (!text || !original || original.role !== "user") return;
+    if (original.content === text) return;
+    if (busyRef.current) {
+      abortRef.current?.abort();
+      queueRef.current = [];
+      setQueue([]);
+    }
+    const next = prev.slice(0, index);
+    next.push({ role: "user", content: text });
+    messagesRef.current = next;
+    setMessages(next);
+    void streamTurn();
+  }
+
+  /** Reenvía la misma pregunta como un nuevo turno (mantiene el hilo). */
+  function reenviar(index: number) {
+    const m = messagesRef.current[index];
+    if (!m || m.role !== "user") return;
+    void send(m.content);
+  }
+
+  /** Regenera la respuesta de un turno: recalcula desde la pregunta original de ese turno. */
+  function regenerarDesde(index: number) {
+    const prev = messagesRef.current;
+    const target = prev[index];
+    if (!target || target.role !== "assistant") return;
+    let ui = index - 1;
+    while (ui >= 0 && prev[ui]?.role !== "user") ui--;
+    if (ui < 0) return;
+    if (busyRef.current) {
+      abortRef.current?.abort();
+      queueRef.current = [];
+      setQueue([]);
+    }
+    const next = prev.slice(0, ui + 1);
+    messagesRef.current = next;
+    setMessages(next);
+    void streamTurn();
   }
 
   return (
@@ -540,7 +656,8 @@ export function ChatWidget() {
               messagesRef.current = reset;
               setMessages(reset);
             }}
-            aria-label="Limpiar conversación"
+            aria-label="Reestablecer conversación"
+            title="Reestablecer la conversación"
             className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <Trash2 className="h-4 w-4" />
@@ -569,56 +686,173 @@ export function ChatWidget() {
 
         {!minimized && (
           <>
-            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={m.role === "user" ? "flex justify-end" : "flex justify-start"}
-                >
-                  <div
-                    className={
-                      m.role === "user"
-                        ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2.5 text-[13px] leading-relaxed text-primary-foreground"
-                        : "max-w-[92%] text-[13px] leading-relaxed text-foreground"
-                    }
-                  >
-                    {m.role === "assistant" && !m.content ? (
-                      <span className="text-muted-foreground">Escribiendo…</span>
-                    ) : (
-                      <div className="chat-md">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            a: ({ href, children }) => (
-                              <LinkRenderer href={href}>{children}</LinkRenderer>
-                            ),
-                          }}
-                        >
-                          {m.content}
-                        </ReactMarkdown>
-                      </div>
-                    )}
-                    {m.role === "assistant" && m.sources && m.sources.length > 0 && (
-                      <p className="mt-2 border-t border-border pt-2 text-[10.5px] leading-snug text-muted-foreground">
-                        Fuentes consultadas:{" "}
-                        {m.sources.slice(0, 3).map((s, idx) => (
-                          <span key={s.url}>
-                            {idx > 0 && " · "}
-                            <a
-                              href={s.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary underline underline-offset-2"
+            <div ref={scrollRef} className="chat-cq flex-1 space-y-3 overflow-y-auto px-4 py-4">
+              {messages.map((m, i) => {
+                const isStreamingTurn =
+                  loading && i === messages.length - 1 && m.role === "assistant" && !m.content;
+                const isUser = m.role === "user";
+                const wasEditing = editingIdx === i;
+                const accBtn =
+                  "inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary";
+                return (
+                  <div key={i} className="group flex w-full min-w-0 flex-col gap-1">
+                    <div
+                      className={`flex w-full min-w-0 ${isUser ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={
+                          isUser
+                            ? "max-w-[min(86%,min(92vw,640px))] min-w-0 rounded-2xl rounded-br-sm bg-primary px-3.5 py-2.5 text-[13px] leading-relaxed text-primary-foreground shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+                            : `max-w-[min(94%,min(96vw,980px))] min-w-0 rounded-2xl rounded-bl-sm border border-border/70 bg-background/45 px-3.5 py-2.5 text-[13px] leading-relaxed text-foreground backdrop-blur-sm ${
+                                isStreamingTurn ? "border-primary/40 bg-primary/[0.05]" : ""
+                              }`
+                        }
+                      >
+                        {wasEditing ? (
+                          <div className="min-w-0">
+                            <textarea
+                              autoFocus
+                              ref={(el) => el?.focus()}
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  saveEdit();
+                                }
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                              rows={2}
+                              placeholder="Editá tu consulta…"
+                              className="w-full resize-none rounded-lg border border-border bg-background/80 px-2.5 py-2 text-[13px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/60"
+                            />
+                            <div className="mt-2 flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={saveEdit}
+                                aria-label="Guardar edición"
+                                className="rounded-lg bg-primary px-2.5 py-1 text-[11.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEdit}
+                                aria-label="Cancelar edición"
+                                className="rounded-lg border border-border px-2.5 py-1 text-[11.5px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : isUser ? (
+                          <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                        ) : !m.content ? (
+                          <span className="text-muted-foreground">Escribiendo…</span>
+                        ) : (
+                          <div className="chat-md min-w-0">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                a: ({ href, children }) => (
+                                  <LinkRenderer href={href}>{children}</LinkRenderer>
+                                ),
+                              }}
                             >
-                              {s.dominio}
-                            </a>
-                          </span>
-                        ))}
-                      </p>
-                    )}
+                              {m.content}
+                            </ReactMarkdown>
+                          </div>
+                        )}
+                        {!wasEditing &&
+                          m.role === "assistant" &&
+                          m.sources &&
+                          m.sources.length > 0 && (
+                            <p className="mt-2 border-t border-border pt-2 text-[10.5px] leading-snug text-muted-foreground">
+                              Fuentes consultadas:{" "}
+                              {m.sources.slice(0, 3).map((s, idx) => (
+                                <span key={s.url}>
+                                  {idx > 0 && " · "}
+                                  <a
+                                    href={s.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary underline underline-offset-2"
+                                  >
+                                    {s.dominio}
+                                  </a>
+                                </span>
+                              ))}
+                            </p>
+                          )}
+                        {isStreamingTurn && (
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
+                            <button
+                              type="button"
+                              onClick={togglePause}
+                              aria-label={paused ? "Reanudar respuesta" : "Pausar respuesta"}
+                              title={paused ? "Reanudar" : "Pausar"}
+                              className={`${accBtn} ${paused ? "text-primary" : ""}`}
+                            >
+                              {paused ? (
+                                <Play className="h-3.5 w-3.5" />
+                              ) : (
+                                <Pause className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelCurrent}
+                              aria-label="Detener respuesta en curso"
+                              title="Detener la respuesta actual"
+                              className={`${accBtn} hover:text-destructive hover:bg-destructive/10`}
+                            >
+                              <Square className="h-3 w-3" />
+                            </button>
+                            {paused && (
+                              <span className="text-[10.5px] text-muted-foreground">Pausado</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {isUser && !wasEditing ? (
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(i)}
+                          aria-label="Editar mensaje"
+                          title="Editar mensaje"
+                          className={accBtn}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => reenviar(i)}
+                          aria-label="Reenviar mensaje"
+                          title="Reenviar este mensaje"
+                          className={accBtn}
+                        >
+                          <RotateCw className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : !isStreamingTurn && m.role === "assistant" && m.content ? (
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => regenerarDesde(i)}
+                          aria-label="Reenviar / regenerar respuesta"
+                          title="Reenviar y regenerar esta respuesta"
+                          className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                        >
+                          <RotateCw className="h-3 w-3" />
+                          Reenviar
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {searching !== null && (
                 <p className="flex items-center gap-2 text-[12px] text-primary">
                   <Search className="h-3.5 w-3.5 animate-pulse" />

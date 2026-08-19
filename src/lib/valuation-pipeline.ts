@@ -88,7 +88,6 @@ export async function analisisValorIntrinseco(
 
   const base: AnalisisCompleto = {
     ok: false,
-    error: undefined,
     simbolo: simboloConsulta,
     simboloResuelto: simboloConsulta,
     empresa: null,
@@ -151,7 +150,7 @@ export async function analisisValorIntrinseco(
     tipo: "paper",
     descripcion: `Paper: ${paper.nombre}${paper.id ? ` (${paper.id})` : ""}`,
     archivo: paper.archivo,
-    url: paper.rutaAbsoluta ?? undefined,
+    ...(paper.rutaAbsoluta ? { url: paper.rutaAbsoluta } : {}),
   });
 
   // 2) Símbolo → ticker de Yahoo.
@@ -387,7 +386,7 @@ export async function analisisValorIntrinseco(
     empresa: fund.nombre,
     precioActual: precio,
     moneda: fund.moneda,
-    valorPorAccion: resultado.valor_por_accion,
+    valorPorAccion: resultado.valor_por_accion ?? null,
     upsidePct: upside,
     recomendacion: upside != null ? recomendacionDeUpside(upside) : null,
     metodologia: paper,
