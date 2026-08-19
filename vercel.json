@@ -1,9 +1,6 @@
 {
   "framework": "vite",
   "buildCommand": "vite build",
-  "outputDirectory": ".output/public",
-  "installCommand": "npm install",
-  "redirects": [
-    { "source": "/(.*)", "destination": "/index.html", "statusCode": 200 }
-  ]
+  "outputDirectory": "dist",
+  "installCommand": "npm install"
 }
