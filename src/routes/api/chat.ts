@@ -225,7 +225,7 @@ export const Route = createFileRoute("/api/chat")({
                   .join("\n");
                 ragMsg = {
                   role: "system",
-                  content: `Contexto recuperado de la base de conocimiento interna del sitio y del material académico indexado (USALO solo si corresponde a la pregunta; puede no aplicar):\n${contenidoRag}`,
+                  content: `Contexto recuperado de la base de conocimiento interna del sitio y del material académico indexado (USALO SOLO si responde directamente la pregunta; si no, ignoralo; este contexto NO reemplaza a una herramienta ejecutada en este turno). Si la pregunta pide un dato actual o verificable (cotización, tasa, noticia, valor, matrícula, normativa, regulación CNV, beta, riesgo), la respuesta debe basarse en lo que devuelva la herramienta ejecutada en este mismo turno y NO en este bloque. PROHIBIDO volcar este contexto como respuesta genérica cuando la pregunta espera un dato real:\n${contenidoRag}`,
                 };
               }
             } catch {

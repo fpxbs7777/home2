@@ -21,6 +21,21 @@ export type Skill = {
 
 const SKILLS: Skill[] = [
   {
+    id: "razonamiento-ejecucion",
+    nombre: "Razonar y Ejecutar",
+    descripcion:
+      "Regla universal anti-respuestas genéricas: razonar la pregunta y ejecutar herramientas antes de responder.",
+    instrucciones: `[SKILL · Razonar y Ejecutar — regla universal]
+- REGLA CENTRAL: nunca respondas con una respuesta genérica ni con un resumen del contexto sin antes razonar QUÉ pide el usuario y si hace falta un dato real para responderlo.
+- Modo de trabajo obligatorio:
+  1. RAZONÁ el mensaje: ¿pide un dato actual o verificable (cotización, tasa, noticia, normativa, matrícula, valor, beta, riesgo, cobertura, sector), o un concepto/educación?
+  2. Si pide un dato o una verificación → EJECUTÁ la herramienta correspondiente en ESTE MISMO turno (consultar_mercado, buscar_noticias, buscar_web, valor_intrinseco_real, analizar_capm, analizar_riesgo, etc.) antes de escribir una sola palabra.
+  3. Redactá SOLO con lo que devolvió la herramienta, citando la fuente.
+- PROHIBIDO: responder "en general...", "esto suele deberse a...", volcar el contenido del sitio, o reformular la base de conocimiento cuando la pregunta pedía un dato real.
+- Si la herramienta no devuelve el dato o falla → decilo con honestidad ("no tengo ese dato confirmado") y ofrecé verificarlo en la fuente oficial. NUNCA inventes cifras ni completes el vacío con una suposición plausible.
+- Si la pregunta es conceptual/educativa ("qué es X", "diferencia entre A y B", "cómo funciona X") sin dato actual, podés explicar con la base de conocimiento, pero con rigor y sin relleno genérico de cortesía.`,
+  },
+  {
     id: "instruccion-rapida",
     nombre: "Instrucción Rápida",
     descripcion:
@@ -182,8 +197,7 @@ const POR_ID = new Map(SKILLS.map((s) => [s.id, s]));
 
 /** Devuelve las instrucciones de orquestación de las skills indicadas. */
 export function construirPromptSkills(ids: string[] | undefined): string {
-  if (!ids || ids.length === 0) return "";
-  const unicos = Array.from(new Set(ids));
+  const unicos = Array.from(new Set(["razonamiento-ejecucion", ...(ids ?? [])]));
   const bloques: string[] = [];
   for (const id of unicos) {
     const skill = POR_ID.get(id);

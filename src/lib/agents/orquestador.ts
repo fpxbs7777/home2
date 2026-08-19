@@ -38,6 +38,7 @@ import {
 } from "@/lib/agents/ejecutores";
 import type { ConfiguracionOrquestacion } from "@/lib/model-orchestration";
 import { MODELO_POR_DEFECTO } from "@/lib/model-registry";
+import { construirPromptSkills } from "@/lib/skills";
 import type { FuenteMercado } from "@/lib/mercado.server";
 
 export type Msg = { role: "user" | "assistant"; content: string };
@@ -376,6 +377,10 @@ async function trabajarAgente(
     { role: "system", content: agente.sistema },
     { role: "system", content: siteContext },
   ];
+  const reglaUniversalRazonamiento = construirPromptSkills([]);
+  if (reglaUniversalRazonamiento) {
+    mensajes.push({ role: "system", content: reglaUniversalRazonamiento });
+  }
   const ctxMemoria = memoria.contextoMemoria();
   if (ctxMemoria) mensajes.push({ role: "system", content: ctxMemoria });
   if (ragMsg) mensajes.push(ragMsg);
